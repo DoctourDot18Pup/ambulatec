@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "553891451539",
+    "project_id": "ambulatec-6d892",
+    "storage_bucket": "ambulatec-6d892.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:553891451539:android:a63fcf1e2addd112eb7366",
+        "android_client_info": {
+          "package_name": "com.teccelaya.ambulatec"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "553891451539-bjq5dv0gbk9181ij7t3p0ais7u5cb8pj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyASswvWrlThkkLPD7p_OXJ2oCO-fg-kdZk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "553891451539-bjq5dv0gbk9181ij7t3p0ais7u5cb8pj.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "553891451539-hmjov32jnpneg1iqjj8tmi3dbon7ast6.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.teccelaya.ambulatec"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
