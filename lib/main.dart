@@ -89,9 +89,13 @@ class _NotificationWrapperState
 
   void _showBanner(AppNotification n) {
     if (!mounted) return;
+    // Use the navigator key so the context is inside the Navigator/Overlay.
+    final ctx =
+        ref.read(routerProvider).routerDelegate.navigatorKey.currentContext;
+    if (ctx == null) return;
     final isDelivered = n.type == 'order_delivered';
     NotificationBannerController.show(
-      context: context,
+      context: ctx,
       title: isDelivered ? '¡Tu pedido llegó!' : '¡Nuevo pedido!',
       body: isDelivered
           ? 'Califica tu experiencia con ${n.productTitle}'

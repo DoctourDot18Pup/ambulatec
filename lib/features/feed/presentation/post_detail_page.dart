@@ -163,7 +163,10 @@ class _DetailView extends ConsumerWidget {
         children: [
           SingleChildScrollView(
             padding: const EdgeInsets.only(bottom: 100),
-            child: Column(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 720),
+                child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // ── Image gallery ──────────────────────────────────────
@@ -419,7 +422,9 @@ class _DetailView extends ConsumerWidget {
                 ),
               ],
             ),
-          ),
+                ),
+              ),
+            ),
 
           // ── Fixed CTA button ─────────────────────────────────────────
           Positioned(
