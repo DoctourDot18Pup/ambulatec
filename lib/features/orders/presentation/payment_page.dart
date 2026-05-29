@@ -1,16 +1,13 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../feed/domain/post_model.dart';
+import '../../chat/providers/chat_controller.dart';
+import '../../chat/providers/chat_provider.dart';
 import '../domain/order_model.dart';
-import '../providers/current_order_provider.dart';
 import '../providers/payment_provider.dart';
 
 // ── Page-scoped form providers ─────────────────────────────────────────────
@@ -49,14 +46,6 @@ bool _isValidExpiry(String expiry) {
   return expiryDate.isAfter(now);
 }
 
-double _computeTotal(PostModel post, int quantity) {
-  if (!post.hasOffer) return post.price * quantity;
-  if (post.offerType == OfferType.twoForOne) {
-    return post.price * ((quantity + 1) ~/ 2);
-  }
-  return post.price * quantity;
-}
-
 String _fmtPrice(double v) =>
     '\$${v.toStringAsFixed(v % 1 == 0 ? 0 : 2)}';
 
@@ -67,61 +56,66 @@ class PaymentPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final draft = ref.watch(currentOrderProvider);
+    final pendingOrderId = ref.watch(pendingPaymentOrderIdProvider);
 
-    if (draft == null) {
-      return Scaffold(
-        backgroundColor: AppColors.bgPrimary,
-        appBar: _appBar(context),
-        body: Center(
-          child: Text('Sin orden activa',
-              style: AppTextStyles.body
-                  .copyWith(color: AppColors.textSecondary)),
-        ),
+    // ── Flow from chat: pay for an existing awaiting_payment order ─────────
+    if (pendingOrderId != null) {
+      final orderAsync = ref.watch(orderByIdProvider(pendingOrderId));
+      return orderAsync.when(
+        loading: () => _blankScaffold(
+            context, child: const CircularProgressIndicator(color: AppColors.accentGold)),
+        error: (e, _) => _blankScaffold(context,
+            child: Text('$e',
+                style: AppTextStyles.body.copyWith(color: AppColors.error))),
+        data: (order) {
+          if (order == null) {
+            return _blankScaffold(context,
+                child: Text('Orden no encontrada',
+                    style: AppTextStyles.body
+                        .copyWith(color: AppColors.textSecondary)));
+          }
+          final total = order.finalPrice;
+          return LayoutBuilder(builder: (context, constraints) {
+            final isDesktop = constraints.maxWidth >= 1024;
+            return isDesktop
+                ? _DesktopLayoutOrder(order: order, total: total)
+                : _MobileLayoutOrder(order: order, total: total);
+          });
+        },
       );
     }
 
-    final total =
-        _computeTotal(draft.post, draft.quantity);
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isDesktop = constraints.maxWidth >= 1024;
-        return isDesktop
-            ? _DesktopLayout(draft: draft, total: total)
-            : _MobileLayout(draft: draft, total: total);
-      },
+    // ── Fallback: no active order ──────────────────────────────────────────
+    return _blankScaffold(
+      context,
+      child: Text('Sin orden activa',
+          style: AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
     );
   }
 
-  AppBar _appBar(BuildContext context) => AppBar(
-        backgroundColor: AppColors.bgSurface,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back,
-              color: AppColors.textPrimary),
-          onPressed: () => context.go('/order-summary'),
+  Scaffold _blankScaffold(BuildContext context, {required Widget child}) =>
+      Scaffold(
+        backgroundColor: AppColors.bgPrimary,
+        appBar: AppBar(
+          backgroundColor: AppColors.bgSurface,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+            onPressed: () => context.pop(),
+          ),
+          title: Text('Pago',
+              style: AppTextStyles.h3.copyWith(color: AppColors.textPrimary)),
         ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Pago',
-                style: AppTextStyles.h3
-                    .copyWith(color: AppColors.textPrimary)),
-            Text('Pago seguro · Stripe',
-                style: AppTextStyles.caption
-                    .copyWith(color: AppColors.textSecondary)),
-          ],
-        ),
+        body: Center(child: child),
       );
 }
 
-// ── Mobile layout ──────────────────────────────────────────────────────────
+// ── Mobile layout (existing order) ────────────────────────────────────────
 
-class _MobileLayout extends ConsumerWidget {
-  final OrderDraft draft;
+class _MobileLayoutOrder extends ConsumerWidget {
+  final OrderModel order;
   final double total;
-  const _MobileLayout({required this.draft, required this.total});
+  const _MobileLayoutOrder({required this.order, required this.total});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -134,16 +128,14 @@ class _MobileLayout extends ConsumerWidget {
         backgroundColor: AppColors.bgSurface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back,
-              color: AppColors.textPrimary),
-          onPressed: () => context.go('/order-summary'),
+          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          onPressed: () => context.pop(),
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Pago',
-                style: AppTextStyles.h3
-                    .copyWith(color: AppColors.textPrimary)),
+                style: AppTextStyles.h3.copyWith(color: AppColors.textPrimary)),
             Text('Pago seguro · Stripe',
                 style: AppTextStyles.caption
                     .copyWith(color: AppColors.textSecondary)),
@@ -156,7 +148,7 @@ class _MobileLayout extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
             child: Column(
               children: [
-                _ProductSummaryCard(draft: draft, total: total),
+                _OrderSummaryCard(order: order, total: total),
                 const SizedBox(height: 16),
                 const _CardForm(showPostalCode: false),
                 const SizedBox(height: 16),
@@ -170,9 +162,9 @@ class _MobileLayout extends ConsumerWidget {
             bottom: 0,
             left: 0,
             right: 0,
-            child: _PayButton(
+            child: _PayButtonOrder(
               total: total,
-              draft: draft,
+              order: order,
               isFormValid: isFormValid,
               isLoading: payState.isLoading,
             ),
@@ -183,12 +175,12 @@ class _MobileLayout extends ConsumerWidget {
   }
 }
 
-// ── Desktop layout ─────────────────────────────────────────────────────────
+// ── Desktop layout (existing order) ───────────────────────────────────────
 
-class _DesktopLayout extends ConsumerWidget {
-  final OrderDraft draft;
+class _DesktopLayoutOrder extends ConsumerWidget {
+  final OrderModel order;
   final double total;
-  const _DesktopLayout({required this.draft, required this.total});
+  const _DesktopLayoutOrder({required this.order, required this.total});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -210,15 +202,13 @@ class _DesktopLayout extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Modal header
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 20, 8, 0),
                   child: Row(
                     children: [
                       Expanded(
                         child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text('Pago',
                                 style: AppTextStyles.h3.copyWith(
@@ -232,7 +222,7 @@ class _DesktopLayout extends ConsumerWidget {
                       IconButton(
                         icon: const Icon(Icons.close,
                             color: AppColors.textSecondary),
-                        onPressed: () => context.go('/order-summary'),
+                        onPressed: () => context.pop(),
                       ),
                     ],
                   ),
@@ -243,8 +233,7 @@ class _DesktopLayout extends ConsumerWidget {
                     padding: const EdgeInsets.all(20),
                     child: Column(
                       children: [
-                        _ProductSummaryCard(
-                            draft: draft, total: total),
+                        _OrderSummaryCard(order: order, total: total),
                         const SizedBox(height: 16),
                         const _CardForm(showPostalCode: true),
                         const SizedBox(height: 16),
@@ -252,9 +241,9 @@ class _DesktopLayout extends ConsumerWidget {
                         const SizedBox(height: 12),
                         _SecurityNote(),
                         const SizedBox(height: 16),
-                        _PayButton(
+                        _PayButtonOrder(
                           total: total,
-                          draft: draft,
+                          order: order,
                           isFormValid: isFormValid,
                           isLoading: payState.isLoading,
                         ),
@@ -272,17 +261,15 @@ class _DesktopLayout extends ConsumerWidget {
   }
 }
 
-// ── Product summary card ───────────────────────────────────────────────────
+// ── Order summary card ─────────────────────────────────────────────────────
 
-class _ProductSummaryCard extends StatelessWidget {
-  final OrderDraft draft;
+class _OrderSummaryCard extends StatelessWidget {
+  final OrderModel order;
   final double total;
-  const _ProductSummaryCard(
-      {required this.draft, required this.total});
+  const _OrderSummaryCard({required this.order, required this.total});
 
   @override
   Widget build(BuildContext context) {
-    final post = draft.post;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -292,22 +279,21 @@ class _ProductSummaryCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          if (post.mediaUrls.isNotEmpty)
+          if (order.postMediaUrls.isNotEmpty)
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: CachedNetworkImage(
-                imageUrl: post.mediaUrls.first,
+                imageUrl: order.postMediaUrls.first,
                 width: 60,
                 height: 60,
                 fit: BoxFit.cover,
-                placeholder: (_, _) => Container(
-                    color: AppColors.bgSurface, width: 60, height: 60),
+                placeholder: (_, _) =>
+                    Container(color: AppColors.bgSurface, width: 60, height: 60),
                 errorWidget: (_, _, _) => Container(
                     color: AppColors.bgSurface,
                     width: 60,
                     height: 60,
-                    child: const Icon(
-                        Icons.image_not_supported_outlined,
+                    child: const Icon(Icons.image_not_supported_outlined,
                         color: AppColors.textSecondary)),
               ),
             ),
@@ -316,44 +302,20 @@ class _ProductSummaryCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(post.vendorName,
+                Text('ORDEN #AT-${order.id.substring(0, 6).toUpperCase()}',
                     style: AppTextStyles.caption
                         .copyWith(color: AppColors.textSecondary)),
                 const SizedBox(height: 2),
-                Text(post.title,
+                Text(order.postTitle,
                     style: AppTextStyles.body
                         .copyWith(color: AppColors.textPrimary),
                     overflow: TextOverflow.ellipsis),
-                if (draft.quantity > 1) ...[
-                  const SizedBox(height: 2),
-                  Text('× ${draft.quantity}',
-                      style: AppTextStyles.caption
-                          .copyWith(color: AppColors.textSecondary)),
-                ],
               ],
             ),
           ),
           const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(_fmtPrice(total),
-                  style: AppTextStyles.h3
-                      .copyWith(color: AppColors.accentGold)),
-              if (post.hasOffer &&
-                  post.originalPrice != null &&
-                  post.originalPrice! > post.price)
-                Text(
-                  _fmtPrice(
-                      (post.originalPrice ?? post.price) *
-                          draft.quantity),
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.textSecondary,
-                    decoration: TextDecoration.lineThrough,
-                  ),
-                ),
-            ],
-          ),
+          Text(_fmtPrice(total),
+              style: AppTextStyles.h3.copyWith(color: AppColors.accentGold)),
         ],
       ),
     );
@@ -587,33 +549,26 @@ class _SecurityNote extends StatelessWidget {
   }
 }
 
-// ── Pay button ─────────────────────────────────────────────────────────────
+// ── Pay button (existing order) ────────────────────────────────────────────
 
-class _PayButton extends ConsumerWidget {
+class _PayButtonOrder extends ConsumerWidget {
   final double total;
-  final OrderDraft draft;
+  final OrderModel order;
   final bool isFormValid;
   final bool isLoading;
 
-  const _PayButton({
+  const _PayButtonOrder({
     required this.total,
-    required this.draft,
+    required this.order,
     required this.isFormValid,
     required this.isLoading,
   });
 
   Future<void> _onPay(BuildContext context, WidgetRef ref) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
     final notifier = ref.read(paymentProvider.notifier);
 
-    // Generate Firestore doc reference before paying (passes orderId to Stripe metadata).
-    final orderRef =
-        FirebaseFirestore.instance.collection('orders').doc();
-
     // ── Step 1: Create PaymentIntent ──────────────────────────────
-    await notifier.createPaymentIntent(total, orderRef.id);
+    await notifier.createPaymentIntent(total, order.id);
 
     final state1 = ref.read(paymentProvider);
     if (state1.error != null) {
@@ -650,57 +605,15 @@ class _PayButton extends ConsumerWidget {
       return;
     }
 
-    // ── Step 3: Write order to Firestore ──────────────────────────
-    final post = draft.post;
-    final quantity = draft.quantity;
-    final originalTotal = (post.originalPrice ?? post.price) * quantity;
+    // ── Step 3: Update order → confirmed + deliveryDeadline ───────
+    await ref.read(chatControllerProvider).markPaid(order);
 
-    final order = OrderModel(
-      id: orderRef.id,
-      buyerId: user.uid,
-      buyerName: user.displayName ?? '',
-      buyerPhotoUrl: user.photoURL ?? '',
-      vendorId: post.vendorId,
-      postId: post.id,
-      postTitle: post.title,
-      postMediaUrls: post.mediaUrls,
-      originalPrice: originalTotal,
-      finalPrice: total,
-      quantity: quantity,
-      offerApplied: post.hasOffer,
-      offerType: post.offerType,
-      deliveryNote: draft.deliveryNote,
-      deliveryImageUrl: null,
-      status: OrderStatus.pending,
-      createdAt: DateTime.now(),
-      chatExpiresAt:
-          DateTime.now().add(const Duration(hours: 24)),
-    );
-
-    await orderRef.set(order.toMap());
-
-    // ── Step 4: Write in-app notification for the vendor ──────────
-    // The notification drives the Firestore-based banner shown in
-    // _NotificationWrapper. No FCM / Blaze plan required.
-    await FirebaseFirestore.instance
-        .collection(AppConstants.notificationsCollection)
-        .doc(orderRef.id)
-        .set({
-      'type': 'new_order',
-      'recipientId': post.vendorId, // vendor receives this
-      'vendorId': post.vendorId,
-      'orderId': orderRef.id,
-      'buyerName': user.displayName ?? '',
-      'productTitle': post.title,
-      'status': 'unread',
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-
-    // ── Step 5: Navigate to confirmation ──────────────────────────
-    ref.read(confirmedOrderIdProvider.notifier).state = orderRef.id;
+    // Clear pending payment reference.
+    ref.read(pendingPaymentOrderIdProvider.notifier).state = null;
+    ref.read(paymentProvider.notifier).reset();
 
     if (context.mounted) {
-      context.go('/order-confirmed');
+      context.go('/chat/${order.id}');
     }
   }
 
@@ -710,17 +623,15 @@ class _PayButton extends ConsumerWidget {
       color: AppColors.bgPrimary,
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
       child: ElevatedButton(
-        onPressed: (isFormValid && !isLoading)
-            ? () => _onPay(context, ref)
-            : null,
+        onPressed: (isFormValid && !isLoading) ? () => _onPay(context, ref) : null,
         child: isLoading
             ? const SizedBox(
                 width: 22,
                 height: 22,
                 child: CircularProgressIndicator(
                   strokeWidth: 2.5,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                      AppColors.bgPrimary),
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(AppColors.bgPrimary),
                 ),
               )
             : Text('Pagar ${_fmtPrice(total)}'),

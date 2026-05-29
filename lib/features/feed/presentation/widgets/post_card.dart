@@ -41,7 +41,9 @@ class PostCard extends ConsumerWidget {
 
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: Stack(
+        children: [
+          Container(
         decoration: BoxDecoration(
           color: AppColors.bgCard,
           borderRadius: BorderRadius.circular(12),
@@ -233,6 +235,35 @@ class PostCard extends ConsumerWidget {
             ),
           ],
         ),
+          ),
+          // ── Inactive overlay ──────────────────────────────────────
+          if (!post.isActive)
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.bgSurface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.borderOverlay),
+                    ),
+                    child: Text(
+                      'No disponible',
+                      style: AppTextStyles.caption.copyWith(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

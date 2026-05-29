@@ -35,6 +35,8 @@ final _specialPriceProvider =
     StateProvider.autoDispose<String>((ref) => '');
 final _isUploadingProvider =
     StateProvider.autoDispose<bool>((ref) => false);
+final _extrasProvider =
+    StateProvider.autoDispose<List<PostExtra>>((ref) => []);
 
 final _formValidProvider = Provider.autoDispose<bool>((ref) {
   final title = ref.watch(_titleProvider);
@@ -139,6 +141,7 @@ class CreatePostPage extends ConsumerWidget {
     final customDuration = ref.read(_customDurationProvider);
     final discountPctText = ref.read(_discountPercentProvider);
     final specialPriceText = ref.read(_specialPriceProvider);
+    final extras = ref.read(_extrasProvider);
 
     ref.read(_isUploadingProvider.notifier).state = true;
 
@@ -198,6 +201,7 @@ class CreatePostPage extends ConsumerWidget {
         offerExpiresAt: offerExpiresAt,
         createdAt: DateTime.now(),
         isActive: !draft,
+        extras: extras,
       );
 
       await FirebaseFirestore.instance
@@ -430,6 +434,11 @@ class _FormBody extends ConsumerWidget {
             ),
           ),
         ],
+
+        const SizedBox(height: 24),
+
+        // ── Extras / condiments ───────────────────────────────────────
+        const _ExtrasPanel(),
       ],
     );
   }
@@ -700,6 +709,298 @@ class _OfferTypeChip extends ConsumerWidget {
       ),
       side: BorderSide(
         color: selected ? AppColors.accentGold : AppColors.borderOverlay,
+      ),
+    );
+  }
+}
+
+// ── Extras panel ───────────────────────────────────────────────────────────
+
+class _GroupState {
+  final String id;
+  final TextEditingController labelController;
+  final List<TextEditingController> optionControllers;
+  bool isMultiple;
+
+  _GroupState({required this.id})
+      : labelController = TextEditingController(),
+        optionControllers = [
+          TextEditingController(),
+          TextEditingController(),
+        ],
+        isMultiple = false;
+
+  void addOption() =>
+      optionControllers.add(TextEditingController());
+
+  void removeOption(int i) {
+    optionControllers[i].dispose();
+    optionControllers.removeAt(i);
+  }
+
+  void dispose() {
+    labelController.dispose();
+    for (final c in optionControllers) {
+      c.dispose();
+    }
+  }
+}
+
+class _ExtrasPanel extends ConsumerStatefulWidget {
+  const _ExtrasPanel();
+
+  @override
+  ConsumerState<_ExtrasPanel> createState() => _ExtrasPanelState();
+}
+
+class _ExtrasPanelState extends ConsumerState<_ExtrasPanel> {
+  final List<_GroupState> _groups = [];
+  int _nextId = 0;
+
+  @override
+  void dispose() {
+    for (final g in _groups) {
+      g.dispose();
+    }
+    super.dispose();
+  }
+
+  void _syncProvider() {
+    ref.read(_extrasProvider.notifier).state = _groups
+        .map((g) => PostExtra(
+              id: g.id,
+              label: g.labelController.text.trim(),
+              isMultiple: g.isMultiple,
+              options: g.optionControllers
+                  .map((c) => c.text.trim())
+                  .where((s) => s.isNotEmpty)
+                  .toList(),
+            ))
+        .where((e) => e.label.isNotEmpty && e.options.isNotEmpty)
+        .toList();
+  }
+
+  void _addGroup() {
+    setState(() {
+      _groups.add(_GroupState(id: 'extra_${_nextId++}'));
+    });
+  }
+
+  void _removeGroup(int i) {
+    setState(() {
+      _groups[i].dispose();
+      _groups.removeAt(i);
+    });
+    _syncProvider();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'PERSONALIZACIONES',
+              style: AppTextStyles.caption
+                  .copyWith(color: AppColors.textSecondary),
+            ),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: _addGroup,
+              icon: const Icon(Icons.add, size: 16,
+                  color: AppColors.accentGold),
+              label: Text('Agregar grupo',
+                  style: AppTextStyles.caption
+                      .copyWith(color: AppColors.accentGold)),
+              style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+            ),
+          ],
+        ),
+        if (_groups.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, bottom: 4),
+            child: Text(
+              'Opcional. Agrega opciones como tamaño, salsas, extras.',
+              style: AppTextStyles.caption
+                  .copyWith(color: AppColors.textSecondary),
+            ),
+          ),
+        for (int i = 0; i < _groups.length; i++) ...[
+          const SizedBox(height: 12),
+          _GroupCard(
+            group: _groups[i],
+            onRemove: () => _removeGroup(i),
+            onChanged: _syncProvider,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _GroupCard extends StatefulWidget {
+  final _GroupState group;
+  final VoidCallback onRemove;
+  final VoidCallback onChanged;
+
+  const _GroupCard({
+    required this.group,
+    required this.onRemove,
+    required this.onChanged,
+  });
+
+  @override
+  State<_GroupCard> createState() => _GroupCardState();
+}
+
+class _GroupCardState extends State<_GroupCard> {
+  @override
+  Widget build(BuildContext context) {
+    final g = widget.group;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderOverlay),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Label + delete ──────────────────────────────────────────
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: g.labelController,
+                  onChanged: (_) => widget.onChanged(),
+                  style: AppTextStyles.body
+                      .copyWith(color: AppColors.textPrimary),
+                  decoration: InputDecoration(
+                    hintText: 'Nombre del grupo (ej: Tamaño)',
+                    hintStyle: AppTextStyles.body
+                        .copyWith(color: AppColors.textSecondary),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 0, vertical: 8),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(
+                          color: AppColors.accentGold.withValues(alpha: 0.5)),
+                    ),
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline,
+                    color: AppColors.error, size: 18),
+                onPressed: widget.onRemove,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // ── Single / multiple toggle ─────────────────────────────────
+          Row(
+            children: [
+              Text('Selección múltiple',
+                  style: AppTextStyles.caption
+                      .copyWith(color: AppColors.textSecondary)),
+              const Spacer(),
+              Switch(
+                value: g.isMultiple,
+                activeThumbColor: AppColors.accentGold,
+                onChanged: (v) {
+                  setState(() => g.isMultiple = v);
+                  widget.onChanged();
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // ── Options ──────────────────────────────────────────────────
+          Text('Opciones',
+              style: AppTextStyles.caption
+                  .copyWith(color: AppColors.textSecondary)),
+          const SizedBox(height: 6),
+          for (int j = 0; j < g.optionControllers.length; j++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: g.optionControllers[j],
+                      onChanged: (_) => widget.onChanged(),
+                      style: AppTextStyles.body
+                          .copyWith(color: AppColors.textPrimary),
+                      decoration: InputDecoration(
+                        hintText: 'Opción ${j + 1}',
+                        hintStyle: AppTextStyles.caption
+                            .copyWith(color: AppColors.textSecondary),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 8),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide:
+                              BorderSide(color: AppColors.borderOverlay),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide:
+                              BorderSide(color: AppColors.borderOverlay),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(
+                              color:
+                                  AppColors.accentGold.withValues(alpha: 0.6)),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (g.optionControllers.length > 2) ...[
+                    const SizedBox(width: 6),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() => g.removeOption(j));
+                        widget.onChanged();
+                      },
+                      child: const Icon(Icons.remove_circle_outline,
+                          color: AppColors.error, size: 18),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+          // ── Add option ───────────────────────────────────────────────
+          TextButton.icon(
+            onPressed: () {
+              setState(() => g.addOption());
+            },
+            icon: const Icon(Icons.add, size: 14,
+                color: AppColors.textSecondary),
+            label: Text('Agregar opción',
+                style: AppTextStyles.caption
+                    .copyWith(color: AppColors.textSecondary)),
+            style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+          ),
+        ],
       ),
     );
   }

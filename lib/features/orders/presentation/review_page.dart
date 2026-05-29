@@ -89,11 +89,12 @@ class _ReviewContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final reviewState = ref.watch(reviewControllerProvider);
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
+    return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
-        child: Column(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Title ─────────────────────────────────────────────
@@ -162,6 +163,7 @@ class _ReviewContent extends ConsumerWidget {
             // ── Submit ────────────────────────────────────────────
             _SubmitButton(order: order),
           ],
+        ),
         ),
       ),
     );
@@ -382,6 +384,7 @@ class _SubmitButton extends ConsumerWidget {
       buyerId: user.uid,
       buyerName: user.displayName ?? '',
       buyerPhotoUrl: user.photoURL ?? '',
+      postTitle: order.postTitle,
       rating: rating,
       tags: tags.toList(),
       comment: comment.trim().isEmpty ? null : comment.trim(),

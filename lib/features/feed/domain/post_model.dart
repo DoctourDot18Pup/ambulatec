@@ -6,6 +6,38 @@ enum VendorAvailability { active, busy, offline }
 
 enum OfferType { twoForOne, percent, special }
 
+// ── PostExtra ──────────────────────────────────────────────────────────────
+
+/// A configurable extra / condiment group that the buyer can choose when
+/// placing an order (e.g. "Tamaño: chico / mediano / grande").
+class PostExtra {
+  final String id;
+  final String label;
+  final bool isMultiple;
+  final List<String> options;
+
+  const PostExtra({
+    required this.id,
+    required this.label,
+    required this.isMultiple,
+    required this.options,
+  });
+
+  factory PostExtra.fromMap(Map<String, dynamic> map) => PostExtra(
+        id: map['id'] as String? ?? '',
+        label: map['label'] as String? ?? '',
+        isMultiple: map['isMultiple'] as bool? ?? false,
+        options: List<String>.from(map['options'] as List? ?? []),
+      );
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'label': label,
+        'isMultiple': isMultiple,
+        'options': options,
+      };
+}
+
 // ── Model ──────────────────────────────────────────────────────────────────
 
 class PostModel {
@@ -27,6 +59,7 @@ class PostModel {
   final DateTime? offerExpiresAt;
   final DateTime createdAt;
   final bool isActive;
+  final List<PostExtra> extras;
 
   const PostModel({
     required this.id,
@@ -47,6 +80,7 @@ class PostModel {
     this.offerExpiresAt,
     required this.createdAt,
     required this.isActive,
+    this.extras = const [],
   });
 
   // ── Factory ────────────────────────────────────────────────────────────────
@@ -103,6 +137,10 @@ class PostModel {
           : null,
       createdAt: parseDate(map['createdAt']),
       isActive: map['isActive'] as bool? ?? true,
+      extras: (map['extras'] as List?)
+              ?.map((e) => PostExtra.fromMap(Map<String, dynamic>.from(e as Map)))
+              .toList() ??
+          [],
     );
   }
 
@@ -128,6 +166,7 @@ class PostModel {
             : null,
         'createdAt': Timestamp.fromDate(createdAt),
         'isActive': isActive,
+        'extras': extras.map((e) => e.toMap()).toList(),
       };
 
   // ── copyWith ───────────────────────────────────────────────────────────────
@@ -151,6 +190,7 @@ class PostModel {
     DateTime? offerExpiresAt,
     DateTime? createdAt,
     bool? isActive,
+    List<PostExtra>? extras,
   }) {
     return PostModel(
       id: id ?? this.id,
@@ -171,6 +211,7 @@ class PostModel {
       offerExpiresAt: offerExpiresAt ?? this.offerExpiresAt,
       createdAt: createdAt ?? this.createdAt,
       isActive: isActive ?? this.isActive,
+      extras: extras ?? this.extras,
     );
   }
 

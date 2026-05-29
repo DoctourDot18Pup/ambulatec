@@ -456,6 +456,7 @@ class _OrderListItem extends StatelessWidget {
       case OrderStatus.delivered:
         return AppColors.accentGreen;
       case OrderStatus.pending:
+      case OrderStatus.awaiting_payment:
         return AppColors.accentGold;
       case OrderStatus.cancelled:
       case OrderStatus.rejected:
@@ -471,6 +472,8 @@ class _OrderListItem extends StatelessWidget {
         return 'Entregada';
       case OrderStatus.pending:
         return 'Pendiente';
+      case OrderStatus.awaiting_payment:
+        return 'Pago pendiente';
       case OrderStatus.cancelled:
         return 'Cancelada';
       case OrderStatus.rejected:

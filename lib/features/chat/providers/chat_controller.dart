@@ -7,15 +7,11 @@ import '../domain/message_model.dart';
 
 // ── Chat controller ────────────────────────────────────────────────────────
 
-/// Provides chat interaction methods and order status transitions.
-///
-/// All public methods are `async` and guard against null auth.
 class ChatController {
   const ChatController();
 
   // ── Messages ───────────────────────────────────────────────────────────────
 
-  /// Sends a text message from the current Firebase user.
   Future<void> sendMessage(String orderId, String text) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null || text.trim().isEmpty) return;
@@ -38,35 +34,118 @@ class ChatController {
 
   // ── Order transitions ──────────────────────────────────────────────────────
 
-  /// Vendor confirms the order: `pending → confirmed`.
-  ///
-  /// Writes a system message to the chat so both parties see the update.
-  Future<void> confirmOrder(String orderId) async {
+  /// Vendor accepts: `pending → awaiting_payment`.
+  /// Optional [quantity] overrides the buyer-requested amount and recalculates
+  /// [finalPrice] = [OrderModel.originalPrice] × quantity.
+  Future<void> confirmOrder(OrderModel order, {int? quantity}) async {
+    final Map<String, dynamic> update = {
+      'status': OrderStatus.awaiting_payment.name,
+    };
+    if (quantity != null && quantity != order.quantity) {
+      update['quantity'] = quantity;
+      update['finalPrice'] = order.originalPrice * quantity;
+    }
+
     await FirebaseFirestore.instance
         .collection(AppConstants.ordersCollection)
-        .doc(orderId)
+        .doc(order.id)
+        .update(update);
+
+    final qtyNote =
+        (quantity != null && quantity != order.quantity)
+            ? ' Cantidad ajustada a $quantity.'
+            : '';
+
+    await _addSystemMessage(
+        order.id,
+        '✅ ¡El vendedor aceptó tu pedido!$qtyNote Procede al pago para confirmarlo.');
+
+    await FirebaseFirestore.instance
+        .collection(AppConstants.notificationsCollection)
+        .add({
+      'type': 'awaiting_payment',
+      'recipientId': order.buyerId,
+      'vendorId': order.vendorId,
+      'orderId': order.id,
+      'buyerName': order.buyerName,
+      'productTitle': order.postTitle,
+      'status': 'unread',
+      'createdAt': Timestamp.fromDate(DateTime.now()),
+    });
+  }
+
+  /// Vendor adjusts quantity after acceptance (while `awaiting_payment`).
+  /// Updates [quantity] and recalculates [finalPrice], then sends a system message.
+  Future<void> updateQuantityAndBill(OrderModel order, int quantity) async {
+    final newTotal = order.originalPrice * quantity;
+    await FirebaseFirestore.instance
+        .collection(AppConstants.ordersCollection)
+        .doc(order.id)
+        .update({
+      'quantity': quantity,
+      'finalPrice': newTotal,
+    });
+
+    final fmt = newTotal % 1 == 0
+        ? newTotal.toStringAsFixed(0)
+        : newTotal.toStringAsFixed(2);
+    await _addSystemMessage(
+        order.id,
+        '🔄 El vendedor ajustó la cantidad a $quantity. Nuevo total: \$$fmt');
+  }
+
+  /// Vendor rejects: `pending → rejected`.
+  /// Also auto-deactivates the post so it won't receive new requests.
+  Future<void> rejectOrder(OrderModel order) async {
+    await FirebaseFirestore.instance
+        .collection(AppConstants.ordersCollection)
+        .doc(order.id)
+        .update({'status': OrderStatus.rejected.name});
+
+    // Auto-deactivate the associated post.
+    if (order.postId.isNotEmpty) {
+      await FirebaseFirestore.instance
+          .collection(AppConstants.postsCollection)
+          .doc(order.postId)
+          .update({'isActive': false});
+    }
+
+    await _addSystemMessage(
+        order.id, '❌ El vendedor no pudo aceptar este pedido.');
+  }
+
+  /// Called after buyer pays: `awaiting_payment → confirmed`.
+  /// Sets `deliveryDeadlineAt` to 1 hour from now.
+  Future<void> markPaid(OrderModel order) async {
+    final deadline = DateTime.now().add(const Duration(hours: 1));
+    await FirebaseFirestore.instance
+        .collection(AppConstants.ordersCollection)
+        .doc(order.id)
         .update({
       'status': OrderStatus.confirmed.name,
       'confirmedAt': Timestamp.fromDate(DateTime.now()),
+      'deliveryDeadlineAt': Timestamp.fromDate(deadline),
     });
-    await _addSystemMessage(
-        orderId, '✅ Vendedor confirmó el pedido. ¡Ya está en preparación!');
-  }
 
-  /// Vendor rejects the order: `pending → rejected`.
-  Future<void> rejectOrder(String orderId) async {
+    await _addSystemMessage(order.id,
+        '💳 ¡Pago recibido! El vendedor tiene 1 hora para entregar tu pedido.');
+
+    // Notify vendor that payment was received.
     await FirebaseFirestore.instance
-        .collection(AppConstants.ordersCollection)
-        .doc(orderId)
-        .update({'status': OrderStatus.rejected.name});
-    await _addSystemMessage(
-        orderId, '❌ El vendedor no pudo aceptar este pedido.');
+        .collection(AppConstants.notificationsCollection)
+        .add({
+      'type': 'payment_received',
+      'recipientId': order.vendorId,
+      'vendorId': order.vendorId,
+      'orderId': order.id,
+      'buyerName': order.buyerName,
+      'productTitle': order.postTitle,
+      'status': 'unread',
+      'createdAt': Timestamp.fromDate(DateTime.now()),
+    });
   }
 
-  /// Vendor marks the order as delivered: `confirmed → delivered`.
-  ///
-  /// Also writes an `order_delivered` notification directed at the buyer
-  /// so the [_NotificationWrapper] can show them the review banner.
+  /// Vendor marks delivered: `confirmed → delivered`.
   Future<void> markDelivered(OrderModel order) async {
     await FirebaseFirestore.instance
         .collection(AppConstants.ordersCollection)
@@ -78,12 +157,12 @@ class ChatController {
     await _addSystemMessage(
         order.id, '🎉 ¡El vendedor marcó el pedido como entregado!');
 
-    // Notify the buyer so they can leave a review.
+    // Notify buyer to leave a review.
     await FirebaseFirestore.instance
         .collection(AppConstants.notificationsCollection)
         .add({
       'type': 'order_delivered',
-      'recipientId': order.buyerId, // buyer receives this
+      'recipientId': order.buyerId,
       'buyerId': order.buyerId,
       'vendorId': order.vendorId,
       'orderId': order.id,
@@ -92,6 +171,29 @@ class ChatController {
       'status': 'unread',
       'createdAt': Timestamp.fromDate(DateTime.now()),
     });
+  }
+
+  /// Auto-refund simulation: vendor missed the 1-hour deadline.
+  /// Sets order to `cancelled`, flags the vendor.
+  Future<void> autoRefundExpired(OrderModel order) async {
+    await FirebaseFirestore.instance
+        .collection(AppConstants.ordersCollection)
+        .doc(order.id)
+        .update({
+      'status': OrderStatus.cancelled.name,
+      'isFlagged': true,
+    });
+
+    // Increment vendor flag count in user document.
+    await FirebaseFirestore.instance
+        .collection(AppConstants.usersCollection)
+        .doc(order.vendorId)
+        .update({'flagCount': FieldValue.increment(1)});
+
+    await _addSystemMessage(
+        order.id,
+        '⏰ El tiempo de entrega expiró. El pedido fue cancelado y se '
+        'procesó el reembolso automático.');
   }
 
   // ── Internal helpers ───────────────────────────────────────────────────────
