@@ -135,13 +135,9 @@ class OrderConfirmedPage extends ConsumerWidget {
                   TextButton(
                     onPressed: () {
                       // Clear order state before leaving
-                      ref
-                          .read(currentOrderProvider.notifier)
-                          .state = null;
+                      ref.read(currentOrderProvider.notifier).update(null);
                       ref.read(paymentProvider.notifier).reset();
-                      ref
-                          .read(confirmedOrderIdProvider.notifier)
-                          .state = null;
+                      ref.read(confirmedOrderIdProvider.notifier).update(null);
                       context.go('/home');
                     },
                     child: Text(

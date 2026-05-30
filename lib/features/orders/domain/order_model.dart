@@ -4,6 +4,7 @@ import '../../../core/constants/app_constants.dart';
 
 // ── Enums ──────────────────────────────────────────────────────────────────
 
+// ignore: constant_identifier_names
 enum OrderStatus { pending, awaiting_payment, confirmed, delivered, cancelled, rejected }
 
 // ── Model ──────────────────────────────────────────────────────────────────

@@ -14,16 +14,41 @@ import '../domain/post_model.dart';
 
 // ── Page-scoped delivery providers ────────────────────────────────────────
 
+class _StringNotifier extends Notifier<String> {
+  @override
+  String build() => '';
+  void update(String value) => state = value;
+}
+
+class _ImageBytesNotifier extends Notifier<Uint8List?> {
+  @override
+  Uint8List? build() => null;
+  void update(Uint8List? value) => state = value;
+}
+
+class _ExtrasMapNotifier extends Notifier<Map<String, Set<String>>> {
+  @override
+  Map<String, Set<String>> build() => {};
+  void update(Map<String, Set<String>> value) => state = value;
+}
+
+class _IntNotifier extends Notifier<int> {
+  @override
+  int build() => 1;
+  void update(int value) => state = value;
+}
+
 final _deliveryNoteProvider =
-    StateProvider.autoDispose<String>((ref) => '');
+    NotifierProvider.autoDispose<_StringNotifier, String>(_StringNotifier.new);
 final _deliveryImageBytesProvider =
-    StateProvider.autoDispose<Uint8List?>((ref) => null);
+    NotifierProvider.autoDispose<_ImageBytesNotifier, Uint8List?>(_ImageBytesNotifier.new);
 
 /// Selected options per extra: extraId → Set of selected option strings.
 final _selectedExtrasProvider =
-    StateProvider.autoDispose<Map<String, Set<String>>>((ref) => {});
+    NotifierProvider.autoDispose<_ExtrasMapNotifier, Map<String, Set<String>>>(_ExtrasMapNotifier.new);
 
-final _quantityProvider = StateProvider.autoDispose<int>((ref) => 1);
+final _quantityProvider =
+    NotifierProvider.autoDispose<_IntNotifier, int>(_IntNotifier.new);
 
 // ── Offer countdown provider ───────────────────────────────────────────────
 
@@ -134,7 +159,7 @@ class _DetailView extends ConsumerWidget {
       final file = await ImagePicker().pickImage(source: ImageSource.gallery);
       if (file != null) {
         final bytes = await file.readAsBytes();
-        ref.read(_deliveryImageBytesProvider.notifier).state = bytes;
+        ref.read(_deliveryImageBytesProvider.notifier).update(bytes);
       }
     } catch (_) {}
   }
@@ -372,8 +397,7 @@ class _DetailView extends ConsumerWidget {
                         style: AppTextStyles.body
                             .copyWith(color: AppColors.textPrimary),
                         onChanged: (v) =>
-                            ref.read(_deliveryNoteProvider.notifier).state =
-                                v,
+                            ref.read(_deliveryNoteProvider.notifier).update(v),
                         decoration: const InputDecoration(
                           hintText: '¿Dónde te lo entregamos?',
                         ),
@@ -417,7 +441,7 @@ class _DetailView extends ConsumerWidget {
                                         .read(
                                             _deliveryImageBytesProvider
                                                 .notifier)
-                                        .state = null,
+                                        .update(null),
                                     child: Container(
                                       padding: const EdgeInsets.all(2),
                                       decoration: const BoxDecoration(
@@ -459,14 +483,14 @@ class _DetailView extends ConsumerWidget {
                         final extras = selectedExtras.map(
                           (k, v) => MapEntry(k, v.toList()),
                         );
-                        ref.read(currentOrderProvider.notifier).state =
+                        ref.read(currentOrderProvider.notifier).update(
                             OrderDraft(
                           post: post,
                           deliveryNote: deliveryNote,
                           deliveryImageBytes: deliveryImageBytes,
                           selectedExtras: extras,
                           quantity: quantity,
-                        );
+                        ));
                         context.go('/order-summary');
                       }
                     : null,
@@ -550,7 +574,7 @@ class _ExtrasSelector extends ConsumerWidget {
                         if (!isSelected) set.add(opt);
                       }
                       map[extra.id] = set;
-                      ref.read(_selectedExtrasProvider.notifier).state = map;
+                      ref.read(_selectedExtrasProvider.notifier).update(map);
                     },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
@@ -615,7 +639,7 @@ class _QuantityStepper extends ConsumerWidget {
               icon: Icons.remove,
               enabled: qty > 1,
               onTap: () =>
-                  ref.read(_quantityProvider.notifier).state = qty - 1,
+                  ref.read(_quantityProvider.notifier).update(qty - 1),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 18),
@@ -629,7 +653,7 @@ class _QuantityStepper extends ConsumerWidget {
               icon: Icons.add,
               enabled: qty < 99,
               onTap: () =>
-                  ref.read(_quantityProvider.notifier).state = qty + 1,
+                  ref.read(_quantityProvider.notifier).update(qty + 1),
             ),
             const Spacer(),
             if (qty > 1)

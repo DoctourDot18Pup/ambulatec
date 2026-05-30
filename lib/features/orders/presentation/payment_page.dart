@@ -12,12 +12,20 @@ import '../providers/payment_provider.dart';
 
 // ── Page-scoped form providers ─────────────────────────────────────────────
 
+class _StringNotifier extends Notifier<String> {
+  @override
+  String build() => '';
+  void update(String value) => state = value;
+}
+
 final _cardNumberProvider =
-    StateProvider.autoDispose<String>((ref) => '');
-final _expiryProvider = StateProvider.autoDispose<String>((ref) => '');
-final _cvvProvider = StateProvider.autoDispose<String>((ref) => '');
+    NotifierProvider.autoDispose<_StringNotifier, String>(_StringNotifier.new);
+final _expiryProvider =
+    NotifierProvider.autoDispose<_StringNotifier, String>(_StringNotifier.new);
+final _cvvProvider =
+    NotifierProvider.autoDispose<_StringNotifier, String>(_StringNotifier.new);
 final _holderNameProvider =
-    StateProvider.autoDispose<String>((ref) => '');
+    NotifierProvider.autoDispose<_StringNotifier, String>(_StringNotifier.new);
 
 final _paymentFormValidProvider = Provider.autoDispose<bool>((ref) {
   final number =
@@ -388,7 +396,7 @@ class _CardForm extends ConsumerWidget {
                 .copyWith(color: AppColors.textPrimary),
             textCapitalization: TextCapitalization.characters,
             onChanged: (v) =>
-                ref.read(_holderNameProvider.notifier).state = v,
+                ref.read(_holderNameProvider.notifier).update(v),
             decoration:
                 const InputDecoration(hintText: 'COMO APARECE EN LA TARJETA'),
           ),
@@ -438,7 +446,7 @@ class _CardNumberField extends ConsumerWidget {
       keyboardType: TextInputType.number,
       maxLength: 19, // 16 digits + 3 spaces
       onChanged: (v) =>
-          ref.read(_cardNumberProvider.notifier).state = v,
+          ref.read(_cardNumberProvider.notifier).update(v),
       inputFormatters: [
         FilteringTextInputFormatter.digitsOnly,
         _CardNumberFormatter(),
@@ -465,7 +473,7 @@ class _ExpiryField extends ConsumerWidget {
       keyboardType: TextInputType.number,
       maxLength: 7, // "MM / AA"
       onChanged: (v) =>
-          ref.read(_expiryProvider.notifier).state = v,
+          ref.read(_expiryProvider.notifier).update(v),
       inputFormatters: [_ExpiryFormatter()],
       decoration: const InputDecoration(
         hintText: 'MM / AA',
@@ -486,7 +494,7 @@ class _CvvField extends ConsumerWidget {
       keyboardType: TextInputType.number,
       maxLength: 4,
       obscureText: true,
-      onChanged: (v) => ref.read(_cvvProvider.notifier).state = v,
+      onChanged: (v) => ref.read(_cvvProvider.notifier).update(v),
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
       decoration:
           const InputDecoration(hintText: '•••', counterText: ''),
@@ -609,7 +617,7 @@ class _PayButtonOrder extends ConsumerWidget {
     await ref.read(chatControllerProvider).markPaid(order);
 
     // Clear pending payment reference.
-    ref.read(pendingPaymentOrderIdProvider.notifier).state = null;
+    ref.read(pendingPaymentOrderIdProvider.notifier).update(null);
     ref.read(paymentProvider.notifier).reset();
 
     if (context.mounted) {

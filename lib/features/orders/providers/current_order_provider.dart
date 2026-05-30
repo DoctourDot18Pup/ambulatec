@@ -44,6 +44,13 @@ class OrderDraft {
 
 // ── Provider ───────────────────────────────────────────────────────────────
 
+class _CurrentOrderNotifier extends Notifier<OrderDraft?> {
+  @override
+  OrderDraft? build() => null;
+  void update(OrderDraft? value) => state = value;
+}
+
 /// Global (non-autoDispose) so the draft survives navigation between
 /// PostDetailPage and OrderSummaryPage.
-final currentOrderProvider = StateProvider<OrderDraft?>((ref) => null);
+final currentOrderProvider =
+    NotifierProvider<_CurrentOrderNotifier, OrderDraft?>(_CurrentOrderNotifier.new);

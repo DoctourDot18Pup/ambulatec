@@ -9,8 +9,16 @@ import '../domain/review_model.dart';
 import '../providers/vendor_reviews_provider.dart';
 
 const _kPageSize = 5;
+
+class _IntNotifier extends Notifier<int> {
+  @override
+  int build() => _kPageSize;
+  void update(int value) => state = value;
+  void increment(int by) => state += by;
+}
+
 final _visibleCountProvider =
-    StateProvider.autoDispose<int>((ref) => _kPageSize);
+    NotifierProvider.autoDispose<_IntNotifier, int>(_IntNotifier.new);
 
 class MyReviewsPage extends ConsumerWidget {
   const MyReviewsPage({super.key});
@@ -96,7 +104,7 @@ class MyReviewsPage extends ConsumerWidget {
                             child: TextButton.icon(
                               onPressed: () => ref
                                   .read(_visibleCountProvider.notifier)
-                                  .state += _kPageSize,
+                                  .increment(_kPageSize),
                               icon: const Icon(Icons.expand_more,
                                   color: AppColors.accentGold, size: 18),
                               label: Text(

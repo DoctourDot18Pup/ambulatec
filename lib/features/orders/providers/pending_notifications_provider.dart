@@ -25,6 +25,9 @@ class AppNotification {
   /// Notification type. `null` treated as `'new_order'` for back-compat.
   final String? type;
 
+  /// `'unread'` or `'read'`. Used by the history screen to highlight pending items.
+  final String status;
+
   const AppNotification({
     required this.id,
     required this.orderId,
@@ -33,6 +36,7 @@ class AppNotification {
     required this.productTitle,
     required this.createdAt,
     this.type,
+    this.status = 'unread',
   });
 
   factory AppNotification.fromMap(Map<String, dynamic> map, String id) {
@@ -45,8 +49,11 @@ class AppNotification {
       createdAt:
           (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       type: map['type'] as String?,
+      status: map['status'] as String? ?? 'unread',
     );
   }
+
+  bool get isUnread => status == 'unread';
 }
 
 // ── Provider ───────────────────────────────────────────────────────────────

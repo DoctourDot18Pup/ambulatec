@@ -15,8 +15,15 @@ class SearchResults {
 
 // ── Query provider ─────────────────────────────────────────────────────────
 
+class _SearchQueryNotifier extends Notifier<String> {
+  @override
+  String build() => '';
+  void update(String value) => state = value;
+}
+
 /// The text the user has typed in the search bar.
-final searchQueryProvider = StateProvider<String>((ref) => '');
+final searchQueryProvider =
+    NotifierProvider<_SearchQueryNotifier, String>(_SearchQueryNotifier.new);
 
 // ── Results provider ───────────────────────────────────────────────────────
 

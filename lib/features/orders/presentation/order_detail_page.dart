@@ -382,7 +382,7 @@ class _ActionsSection extends ConsumerWidget {
           icon: Icons.payment_outlined,
           color: AppColors.accentGold,
           onTap: () {
-            ref.read(pendingPaymentOrderIdProvider.notifier).state = order.id;
+            ref.read(pendingPaymentOrderIdProvider.notifier).update(order.id);
             context.push('/payment');
           },
         );

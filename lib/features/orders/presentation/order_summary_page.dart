@@ -13,7 +13,14 @@ import '../domain/order_model.dart';
 import '../providers/current_order_provider.dart';
 import '../providers/payment_provider.dart';
 
-final _submittingProvider = StateProvider.autoDispose<bool>((ref) => false);
+class _BoolNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+  void update(bool value) => state = value;
+}
+
+final _submittingProvider =
+    NotifierProvider.autoDispose<_BoolNotifier, bool>(_BoolNotifier.new);
 
 // ── Page ───────────────────────────────────────────────────────────────────
 
@@ -148,7 +155,7 @@ class _SummaryView extends ConsumerWidget {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    ref.read(_submittingProvider.notifier).state = true;
+    ref.read(_submittingProvider.notifier).update(true);
     try {
       final post = draft.post;
       final orderRef =
@@ -200,7 +207,7 @@ class _SummaryView extends ConsumerWidget {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      ref.read(confirmedOrderIdProvider.notifier).state = orderRef.id;
+      ref.read(confirmedOrderIdProvider.notifier).update(orderRef.id);
 
       if (context.mounted) context.go('/order-confirmed');
     } catch (e) {
@@ -212,7 +219,7 @@ class _SummaryView extends ConsumerWidget {
         ));
       }
     } finally {
-      ref.read(_submittingProvider.notifier).state = false;
+      ref.read(_submittingProvider.notifier).update(false);
     }
   }
 }
