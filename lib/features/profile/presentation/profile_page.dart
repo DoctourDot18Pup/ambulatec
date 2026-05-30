@@ -5,12 +5,15 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/widgets/adaptive_scaffold.dart';
+import '../../../shared/widgets/rating_stars_widget.dart';
 import '../../auth/data/auth_controller.dart';
 import '../../auth/domain/user_model.dart';
 import '../../orders/domain/order_model.dart';
 import '../../orders/providers/orders_provider.dart';
 import '../../vendor/providers/vendor_posts_provider.dart';
+import '../domain/review_model.dart';
 import '../providers/profile_provider.dart';
+import '../providers/vendor_reviews_provider.dart';
 
 // ── Page ───────────────────────────────────────────────────────────────────
 
@@ -94,6 +97,12 @@ class _ProfileContent extends ConsumerWidget {
           // ── Vendor section ───────────────────────────────────────
           if (isApprovedVendor) ...[
             _VendorSection(user: user, totalDelivered: totalDelivered),
+            const SizedBox(height: 24),
+          ],
+
+          // ── Vendor reviews ───────────────────────────────────────
+          if (isApprovedVendor) ...[
+            _VendorReviewsList(vendorId: user.uid),
             const SizedBox(height: 24),
           ],
 
@@ -374,6 +383,14 @@ class _OptionsList extends ConsumerWidget {
       ),
       child: Column(
         children: [
+          if (user.roles.contains('vendor')) ...[
+            _OptionTile(
+              icon: Icons.star_outline_rounded,
+              label: 'Mis reseñas',
+              onTap: () => context.push('/my-reviews'),
+            ),
+            _divider(),
+          ],
           _OptionTile(
             icon: Icons.edit_outlined,
             label: 'Editar perfil',
@@ -487,6 +504,134 @@ class _OptionTile extends StatelessWidget {
                 color: AppColors.textSecondary),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Vendor reviews list ────────────────────────────────────────────────────
+
+class _VendorReviewsList extends ConsumerWidget {
+  final String vendorId;
+  const _VendorReviewsList({required this.vendorId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final reviewsAsync = ref.watch(vendorReviewsProvider(vendorId));
+    return reviewsAsync.when(
+      loading: () => const Center(
+          child: CircularProgressIndicator(color: AppColors.accentGold)),
+      error: (e, _) => Text('Error al cargar reseñas: $e',
+          style: AppTextStyles.caption.copyWith(color: AppColors.error)),
+      data: (reviews) {
+        if (reviews.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('MIS RESEÑAS',
+                style: AppTextStyles.caption
+                    .copyWith(color: AppColors.textSecondary)),
+            const SizedBox(height: 12),
+            ...reviews.map((r) => _ReviewDetailTile(review: r)),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ReviewDetailTile extends StatelessWidget {
+  final ReviewModel review;
+  const _ReviewDetailTile({required this.review});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderOverlay),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  review.postTitle.isNotEmpty ? review.postTitle : 'Pedido',
+                  style: AppTextStyles.body.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              RatingStarsWidget(rating: review.rating.toDouble(), size: 13),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 12,
+                backgroundColor: AppColors.accentGreen,
+                backgroundImage: review.buyerPhotoUrl.isNotEmpty
+                    ? NetworkImage(review.buyerPhotoUrl)
+                    : null,
+                child: review.buyerPhotoUrl.isEmpty
+                    ? Text(
+                        review.buyerName.isNotEmpty
+                            ? review.buyerName[0].toUpperCase()
+                            : '?',
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 10),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                review.buyerName.isNotEmpty ? review.buyerName : 'Comprador',
+                style: AppTextStyles.caption
+                    .copyWith(color: AppColors.textSecondary),
+              ),
+              const Spacer(),
+              Text(
+                '${review.createdAt.day}/${review.createdAt.month}/${review.createdAt.year}',
+                style: AppTextStyles.caption
+                    .copyWith(color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+          if (review.tags.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: review.tags
+                  .map((t) => Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.accentGold.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(t,
+                            style: AppTextStyles.caption.copyWith(
+                                color: AppColors.accentGold, fontSize: 10)),
+                      ))
+                  .toList(),
+            ),
+          ],
+          if (review.comment != null && review.comment!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(review.comment!,
+                style: AppTextStyles.body
+                    .copyWith(color: AppColors.textSecondary)),
+          ],
+        ],
       ),
     );
   }

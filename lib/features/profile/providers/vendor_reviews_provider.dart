@@ -16,9 +16,12 @@ final vendorReviewsProvider = StreamProvider.autoDispose
   return FirebaseFirestore.instance
       .collection(AppConstants.reviewsCollection)
       .where('vendorId', isEqualTo: vendorId)
-      .orderBy('createdAt', descending: true)
       .snapshots()
-      .map((snap) => snap.docs
-          .map((d) => ReviewModel.fromMap(d.data(), d.id))
-          .toList());
+      .map((snap) {
+        final list = snap.docs
+            .map((d) => ReviewModel.fromMap(d.data(), d.id))
+            .toList();
+        list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return list;
+      });
 });

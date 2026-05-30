@@ -158,3 +158,7 @@ final paymentProvider =
 /// Stores the Firestore document ID of the just-confirmed order so that
 /// [OrderConfirmedPage] can display it without route params.
 final confirmedOrderIdProvider = StateProvider<String?>((ref) => null);
+
+/// Stores the orderId of an EXISTING order that needs payment (status:
+/// awaiting_payment). Set from ChatPage when the buyer taps "Proceder al pago".
+final pendingPaymentOrderIdProvider = StateProvider<String?>((ref) => null);

@@ -73,6 +73,7 @@ class _BuyerOrdersBody extends ConsumerWidget {
             final active = orders
                 .where((o) =>
                     o.status == OrderStatus.pending ||
+                    o.status == OrderStatus.awaiting_payment ||
                     o.status == OrderStatus.confirmed)
                 .toList();
             final history = orders
@@ -154,6 +155,7 @@ class _VendorOrdersBody extends ConsumerWidget {
             final pending = orders
                 .where((o) =>
                     o.status == OrderStatus.pending ||
+                    o.status == OrderStatus.awaiting_payment ||
                     o.status == OrderStatus.confirmed)
                 .toList();
             final delivered = orders
@@ -243,6 +245,7 @@ class _OrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isActive = order.status == OrderStatus.pending ||
+        order.status == OrderStatus.awaiting_payment ||
         order.status == OrderStatus.confirmed;
     final canReview =
         isBuyer && order.status == OrderStatus.delivered;
@@ -339,6 +342,7 @@ class _StatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final (label, color) = switch (status) {
       OrderStatus.pending => ('Pendiente', AppColors.accentGold),
+      OrderStatus.awaiting_payment => ('Pago pendiente', AppColors.accentGold),
       OrderStatus.confirmed => ('Confirmada', AppColors.success),
       OrderStatus.delivered => ('Entregada', AppColors.accentGreen),
       OrderStatus.cancelled => ('Cancelada', AppColors.textSecondary),
