@@ -18,6 +18,7 @@ import '../domain/review_model.dart';
 import '../providers/profile_controller.dart';
 import '../providers/profile_provider.dart';
 import '../providers/vendor_reviews_provider.dart';
+import 'support_sheet.dart';
 
 // ── Page ───────────────────────────────────────────────────────────────────
 
@@ -425,7 +426,16 @@ class _OptionsList extends ConsumerWidget {
           _OptionTile(
             icon: Icons.help_outline,
             label: 'Ayuda y soporte',
-            onTap: soon,
+            onTap: () => showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: AppColors.bgCard,
+              shape: const RoundedRectangleBorder(
+                borderRadius:
+                    BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              builder: (_) => const SupportSheet(),
+            ),
           ),
           if (user.isAdmin) ...[
             _divider(),
