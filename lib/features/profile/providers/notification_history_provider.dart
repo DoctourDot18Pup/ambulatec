@@ -15,10 +15,13 @@ final notificationHistoryProvider =
   return FirebaseFirestore.instance
       .collection(AppConstants.notificationsCollection)
       .where('recipientId', isEqualTo: user.uid)
-      .orderBy('createdAt', descending: true)
       .limit(50)
       .snapshots()
-      .map((snap) => snap.docs
-          .map((d) => AppNotification.fromMap(d.data(), d.id))
-          .toList());
+      .map((snap) {
+        final items = snap.docs
+            .map((d) => AppNotification.fromMap(d.data(), d.id))
+            .toList();
+        items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return items;
+      });
 });
