@@ -28,6 +28,7 @@ import '../../features/vendor/presentation/earnings_page.dart';
 import '../../features/profile/presentation/vendor_profile_page.dart';
 import '../../features/orders/presentation/order_detail_page.dart';
 import '../../features/profile/presentation/my_reviews_page.dart';
+import '../../features/profile/presentation/notification_settings_page.dart';
 
 // ── Router notifier ────────────────────────────────────────────────────────
 
@@ -132,7 +133,7 @@ class RouterNotifier extends ChangeNotifier {
 
 
 final routerNotifierProvider =
-    ChangeNotifierProvider<RouterNotifier>((ref) => RouterNotifier(ref));
+    Provider<RouterNotifier>((ref) => RouterNotifier(ref));
 final routerProvider = Provider<GoRouter>((ref) {
   final notifier = ref.read(routerNotifierProvider);
   return GoRouter(
@@ -271,6 +272,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/my-reviews',
         name: 'myReviews',
         builder: (context, state) => const MyReviewsPage(),
+      ),
+      GoRoute(
+        path: '/notifications',
+        name: 'notifications',
+        builder: (context, state) => const NotificationSettingsPage(),
       ),
     ],
   );

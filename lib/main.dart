@@ -1,10 +1,12 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'core/router/app_router.dart';
 import 'core/services/notification_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/orders/providers/pending_notifications_provider.dart';
+import 'features/profile/providers/notification_preferences_provider.dart';
 import 'firebase_options.dart';
 import 'shared/widgets/notification_banner.dart';
 
@@ -14,6 +16,7 @@ Future<void> main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    await GoogleSignIn.instance.initialize();
     await NotificationService.initialize();
   } catch (_) {
     // Running without Firebase — auth will always return null (unauthenticated).

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"C:\\\\SDK\\\\flutter\\\\bin\\\\flutter.bat\" analyze *)",
+      "Bash(dart pub *)",
+      "Bash(python -c \"import sys,json; deps=json.load\\(sys.stdin\\); pkg=[p for p in deps.get\\('packages',[]\\) if p['name']=='google_sign_in']; print\\(pkg[0] if pkg else 'not found'\\)\")",
+      "Bash(\"C:\\\\SDK\\\\flutter\\\\bin\\\\flutter.bat\" pub *)",
+      "Bash(findstr google_sign_in)",
+      "Bash(xargs grep -l \"renderButton\")",
+      "Bash(Get-ChildItem -Recurse \"C:\\\\Users\\\\reyes\\\\AppData\\\\Local\\\\Pub\\\\Cache\\\\hosted\\\\pub.dev\\\\google_sign_in-7.2.0\" -Filter \"*.dart\")",
+      "Bash(Select-String \"renderButton\")",
+      "Bash(Select-Object -First 10)"
+    ]
+  }
+}

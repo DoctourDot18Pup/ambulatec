@@ -1,15 +1,62 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+
+import '../../../core/services/google_web_button.dart' as web_button;
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../data/auth_controller.dart';
+import '../data/auth_provider.dart';
+import '../data/user_provider.dart';
 
-class LoginPage extends ConsumerWidget {
+class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Show SnackBar on error.
+  ConsumerState<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends ConsumerState<LoginPage> {
+  StreamSubscription<GoogleSignInAuthenticationEvent>? _authSub;
+
+  @override
+  void initState() {
+    super.initState();
+    if (kIsWeb) {
+      _authSub = GoogleSignIn.instance.authenticationEvents.listen(
+        (event) {
+          if (event is GoogleSignInAuthenticationEventSignIn) {
+            ref
+                .read(authControllerProvider.notifier)
+                .signInFromAccount(event.user);
+          }
+        },
+        onError: (Object e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(e.toString()),
+                backgroundColor: AppColors.error,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        },
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     ref.listen<AsyncValue<void>>(authControllerProvider, (_, state) {
       state.whenOrNull(
         error: (error, _) {
@@ -24,8 +71,16 @@ class LoginPage extends ConsumerWidget {
       );
     });
 
-    final isLoading =
-        ref.watch(authControllerProvider).isLoading;
+    final controllerLoading = ref.watch(authControllerProvider).isLoading;
+    final firebaseUser = ref.watch(authStateProvider).asData?.value;
+    final userAsync = ref.watch(userProvider);
+
+    // Keep loading while: the sign-in operation runs (controllerLoading), OR
+    // Firebase already has a user but Firestore hasn't delivered the profile
+    // yet (isLoading). This prevents the Google button from briefly re-appearing
+    // between signInWithCredential succeeding and the router redirecting.
+    final isLoading = controllerLoading ||
+        (firebaseUser != null && userAsync.isLoading);
 
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
@@ -93,65 +148,67 @@ class LoginPage extends ConsumerWidget {
 
                   const Spacer(flex: 4),
 
-                  // ── Google sign-in button ───────────────────────────────
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: AppColors.bgPrimary,
-                        shape: const StadiumBorder(),
+                  // ── Sign-in button ──────────────────────────────────────
+                  if (isLoading)
+                    const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(AppColors.accentGold),
                       ),
-                      onPressed: isLoading
-                          ? null
-                          : () => ref
-                              .read(authControllerProvider.notifier)
-                              .signInWithGoogle(),
-                      child: isLoading
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  AppColors.accentGold,
+                    )
+                  else if (kIsWeb)
+                    // Web: Google renders its own button; auth events handled
+                    // via the stream subscription in initState.
+                    web_button.renderButton()
+                  else
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: AppColors.bgPrimary,
+                          shape: const StadiumBorder(),
+                        ),
+                        onPressed: () => ref
+                            .read(authControllerProvider.notifier)
+                            .signInWithGoogle(),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 20,
+                              height: 20,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Color(0xFF4285F4),
+                              ),
+                              alignment: Alignment.center,
+                              child: const Text(
+                                'G',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                            )
-                          : Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                // Google logo placeholder
-                                Container(
-                                  width: 20,
-                                  height: 20,
-                                  decoration: const BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Color(0xFF4285F4),
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: const Text(
-                                    'G',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Text(
-                                  'Inicia sesión con Google',
-                                  style: AppTextStyles.body.copyWith(
-                                    color: AppColors.bgPrimary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
                             ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Inicia sesión con Google',
+                              style: AppTextStyles.body.copyWith(
+                                color: AppColors.bgPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
+
                   const SizedBox(height: 16),
 
                   // ── Legal text ──────────────────────────────────────────

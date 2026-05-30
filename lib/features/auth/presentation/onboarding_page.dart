@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
@@ -8,8 +7,14 @@ import '../../../core/theme/app_text_styles.dart';
 
 // ── Page state ────────────────────────────────────────────────────────────
 
+class _IndexNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+  void update(int value) => state = value;
+}
+
 final _onboardingPageIndexProvider =
-    StateProvider.autoDispose<int>((ref) => 0);
+    NotifierProvider.autoDispose<_IndexNotifier, int>(_IndexNotifier.new);
 
 // ── Slide data ────────────────────────────────────────────────────────────
 
@@ -107,7 +112,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
             PageView.builder(
               controller: _pageController,
               onPageChanged: (i) =>
-                  ref.read(_onboardingPageIndexProvider.notifier).state = i,
+                  ref.read(_onboardingPageIndexProvider.notifier).update(i),
               itemCount: _slides.length,
               itemBuilder: (context, index) =>
                   _SlidePage(slide: _slides[index]),
