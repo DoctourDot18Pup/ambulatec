@@ -21,15 +21,46 @@ class AuthController extends Notifier<AsyncValue<void>> {
 
   // ── Public API ─────────────────────────────────────────────────────────────
 
+  /// Signs in using a [GoogleSignInAccount] already obtained from the
+  /// authenticationEvents stream (web-only flow via renderButton).
+  Future<void> signInFromAccount(GoogleSignInAccount account) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      final credential = GoogleAuthProvider.credential(
+        idToken: account.authentication.idToken,
+      );
+      final userCredential =
+          await FirebaseAuth.instance.signInWithCredential(credential);
+      final user = userCredential.user;
+      if (user == null) return;
+
+      final userRef = FirebaseFirestore.instance
+          .collection(AppConstants.usersCollection)
+          .doc(user.uid);
+
+      final snapshot = await userRef.get();
+      if (!snapshot.exists) {
+        await userRef.set(
+          UserModel(
+            uid: user.uid,
+            displayName: user.displayName ?? '',
+            email: user.email ?? '',
+            photoUrl: user.photoURL,
+            roles: [],
+            vendorStatus: null,
+            createdAt: DateTime.now(),
+            onboardingCompleted: true,
+          ).toMap(),
+        );
+      }
+    });
+  }
+
   Future<void> signInWithGoogle() async {
   state = const AsyncLoading();
   state = await AsyncValue.guard(() async {
-    // v7: singleton
-    final googleSignIn = GoogleSignIn.instance;
-    await googleSignIn.initialize();
-
-    // v7: authenticate() reemplaza signIn()
-    final googleUser = await googleSignIn.authenticate();
+    // v7: singleton, initialized once at app startup in main.dart
+    final googleUser = await GoogleSignIn.instance.authenticate();
 
     // .authentication es un getter síncrono en v7 (no Future)
     final googleAuth = googleUser.authentication;

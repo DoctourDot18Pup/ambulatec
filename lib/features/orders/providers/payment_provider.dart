@@ -155,6 +155,18 @@ class PaymentNotifier extends Notifier<PaymentState> {
 final paymentProvider =
     NotifierProvider<PaymentNotifier, PaymentState>(PaymentNotifier.new);
 
+class _NullableStringNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+  void update(String? value) => state = value;
+}
+
 /// Stores the Firestore document ID of the just-confirmed order so that
 /// [OrderConfirmedPage] can display it without route params.
-final confirmedOrderIdProvider = StateProvider<String?>((ref) => null);
+final confirmedOrderIdProvider =
+    NotifierProvider<_NullableStringNotifier, String?>(_NullableStringNotifier.new);
+
+/// Stores the orderId of an EXISTING order that needs payment (status:
+/// awaiting_payment). Set from ChatPage when the buyer taps "Proceder al pago".
+final pendingPaymentOrderIdProvider =
+    NotifierProvider<_NullableStringNotifier, String?>(_NullableStringNotifier.new);

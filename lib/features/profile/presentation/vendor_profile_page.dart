@@ -153,30 +153,14 @@ class _VendorBody extends ConsumerWidget {
                   error: (_, _) => const SizedBox.shrink(),
                   data: (reviews) {
                     if (reviews.isEmpty) return const SizedBox.shrink();
-                    final preview = reviews.take(3).toList();
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text('RESEÑAS',
-                                style: AppTextStyles.caption
-                                    .copyWith(color: AppColors.textSecondary)),
-                            const Spacer(),
-                            if (reviews.length > 3)
-                              GestureDetector(
-                                onTap: () => _showAllReviews(
-                                    context, reviews, vendor.displayName),
-                                child: Text('Ver todas (${reviews.length})',
-                                    style: AppTextStyles.caption
-                                        .copyWith(color: AppColors.accentGold)),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        ...preview.map((r) => _ReviewTile(review: r)),
-                      ],
-                    );
+                    return isSelf
+                        ? _VendorReviewsSection(reviews: reviews)
+                        : _BuyerReviewsSection(
+                            reviews: reviews,
+                            vendorName: vendor.displayName,
+                            onShowAll: () => _showAllReviews(
+                                context, reviews, vendor.displayName),
+                          );
                   },
                 ),
               ],
@@ -435,6 +419,274 @@ class _CompactPostCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Buyer reviews section ──────────────────────────────────────────────────
+
+/// Overview seen by any user viewing someone else's profile.
+/// Shows aggregate: avg stars, total count, tag frequency bars.
+class _BuyerReviewsSection extends StatelessWidget {
+  final List<ReviewModel> reviews;
+  final String vendorName;
+  final VoidCallback onShowAll;
+
+  const _BuyerReviewsSection({
+    required this.reviews,
+    required this.vendorName,
+    required this.onShowAll,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final avg = reviews.map((r) => r.rating).reduce((a, b) => a + b) /
+        reviews.length;
+
+    // Count tag frequency
+    final tagCounts = <String, int>{};
+    for (final r in reviews) {
+      for (final t in r.tags) {
+        tagCounts[t] = (tagCounts[t] ?? 0) + 1;
+      }
+    }
+    final sortedTags = tagCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final topTags = sortedTags.take(5).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text('RESEÑAS',
+                style: AppTextStyles.caption
+                    .copyWith(color: AppColors.textSecondary)),
+            const Spacer(),
+            if (reviews.length > 3)
+              GestureDetector(
+                onTap: onShowAll,
+                child: Text('Ver todas (${reviews.length})',
+                    style: AppTextStyles.caption
+                        .copyWith(color: AppColors.accentGold)),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // ── Aggregate card ───────────────────────────────────────────
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.bgCard,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.borderOverlay),
+          ),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    avg.toStringAsFixed(1),
+                    style: AppTextStyles.h1.copyWith(
+                        color: AppColors.accentGold, fontSize: 42),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      RatingStarsWidget(rating: avg, size: 18),
+                      const SizedBox(height: 2),
+                      Text('${reviews.length} reseñas',
+                          style: AppTextStyles.caption
+                              .copyWith(color: AppColors.textSecondary)),
+                    ],
+                  ),
+                ],
+              ),
+              if (topTags.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                const Divider(color: AppColors.borderOverlay, height: 1),
+                const SizedBox(height: 14),
+                ...topTags.map((e) => _TagBar(
+                      label: e.key,
+                      count: e.value,
+                      total: reviews.length,
+                    )),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // ── Latest 3 reviews ─────────────────────────────────────────
+        ...reviews.take(3).map((r) => _ReviewTile(review: r)),
+      ],
+    );
+  }
+}
+
+// ── Vendor reviews section ─────────────────────────────────────────────────
+
+/// Detailed per-order reviews seen only by the vendor on their own profile.
+class _VendorReviewsSection extends StatelessWidget {
+  final List<ReviewModel> reviews;
+  const _VendorReviewsSection({required this.reviews});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('MIS RESEÑAS',
+            style: AppTextStyles.caption
+                .copyWith(color: AppColors.textSecondary)),
+        const SizedBox(height: 12),
+        ...reviews.map((r) => _VendorReviewTile(review: r)),
+      ],
+    );
+  }
+}
+
+class _VendorReviewTile extends StatelessWidget {
+  final ReviewModel review;
+  const _VendorReviewTile({required this.review});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderOverlay),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Order title + rating ──────────────────────────────────
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  review.postTitle.isNotEmpty ? review.postTitle : 'Pedido',
+                  style: AppTextStyles.body
+                      .copyWith(color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              RatingStarsWidget(rating: review.rating.toDouble(), size: 13),
+            ],
+          ),
+          const SizedBox(height: 6),
+
+          // ── Buyer + date ──────────────────────────────────────────
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 12,
+                backgroundColor: AppColors.accentGreen,
+                backgroundImage: review.buyerPhotoUrl.isNotEmpty
+                    ? NetworkImage(review.buyerPhotoUrl)
+                    : null,
+                child: review.buyerPhotoUrl.isEmpty
+                    ? Text(
+                        review.buyerName.isNotEmpty
+                            ? review.buyerName[0].toUpperCase()
+                            : '?',
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 10),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                review.buyerName.isNotEmpty
+                    ? review.buyerName
+                    : 'Comprador',
+                style: AppTextStyles.caption
+                    .copyWith(color: AppColors.textSecondary),
+              ),
+              const Spacer(),
+              Text(
+                '${review.createdAt.day}/${review.createdAt.month}/${review.createdAt.year}',
+                style: AppTextStyles.caption
+                    .copyWith(color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+
+          // ── Tags ─────────────────────────────────────────────────
+          if (review.tags.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: review.tags.map((t) => _Tag(label: t)).toList(),
+            ),
+          ],
+
+          // ── Comment ───────────────────────────────────────────────
+          if (review.comment != null && review.comment!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              review.comment!,
+              style: AppTextStyles.body
+                  .copyWith(color: AppColors.textSecondary),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── Tag frequency bar ──────────────────────────────────────────────────────
+
+class _TagBar extends StatelessWidget {
+  final String label;
+  final int count;
+  final int total;
+  const _TagBar(
+      {required this.label, required this.count, required this.total});
+
+  @override
+  Widget build(BuildContext context) {
+    final fraction = total == 0 ? 0.0 : count / total;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(label,
+                style: AppTextStyles.caption
+                    .copyWith(color: AppColors.textPrimary),
+                overflow: TextOverflow.ellipsis),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: fraction,
+                minHeight: 6,
+                backgroundColor: AppColors.bgSurface,
+                valueColor: const AlwaysStoppedAnimation<Color>(
+                    AppColors.accentGold),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text('$count',
+              style: AppTextStyles.caption
+                  .copyWith(color: AppColors.textSecondary)),
+        ],
       ),
     );
   }

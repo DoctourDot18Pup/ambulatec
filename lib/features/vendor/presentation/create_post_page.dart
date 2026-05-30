@@ -14,27 +14,77 @@ import '../../feed/domain/post_model.dart';
 
 // ── Page-scoped providers ──────────────────────────────────────────────────
 
-final _titleProvider = StateProvider.autoDispose<String>((ref) => '');
-final _descriptionProvider = StateProvider.autoDispose<String>((ref) => '');
-final _priceProvider = StateProvider.autoDispose<String>((ref) => '');
+class _StringNotifier extends Notifier<String> {
+  final String _initial;
+  _StringNotifier([this._initial = '']);
+  @override
+  String build() => _initial;
+  void update(String value) => state = value;
+}
+
+class _StringComidaNotifier extends Notifier<String> {
+  @override
+  String build() => 'comida';
+  void update(String value) => state = value;
+}
+
+class _ImagesNotifier extends Notifier<List<Uint8List>> {
+  @override
+  List<Uint8List> build() => [];
+  void update(List<Uint8List> value) => state = value;
+}
+
+class _BoolNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+  void update(bool value) => state = value;
+}
+
+class _OfferTypeNotifier extends Notifier<OfferType?> {
+  @override
+  OfferType? build() => null;
+  void update(OfferType? value) => state = value;
+}
+
+class _IntNotifier extends Notifier<int> {
+  @override
+  int build() => 1;
+  void update(int value) => state = value;
+}
+
+class _ExtrasNotifier extends Notifier<List<PostExtra>> {
+  @override
+  List<PostExtra> build() => [];
+  void update(List<PostExtra> value) => state = value;
+}
+
+final _titleProvider =
+    NotifierProvider.autoDispose<_StringNotifier, String>(_StringNotifier.new);
+final _descriptionProvider =
+    NotifierProvider.autoDispose<_StringNotifier, String>(_StringNotifier.new);
+final _priceProvider =
+    NotifierProvider.autoDispose<_StringNotifier, String>(_StringNotifier.new);
 final _categoryProvider =
-    StateProvider.autoDispose<String>((ref) => 'comida');
+    NotifierProvider.autoDispose<_StringComidaNotifier, String>(_StringComidaNotifier.new);
 final _mediaImagesProvider =
-    StateProvider.autoDispose<List<Uint8List>>((ref) => []);
-final _hasOfferProvider = StateProvider.autoDispose<bool>((ref) => false);
+    NotifierProvider.autoDispose<_ImagesNotifier, List<Uint8List>>(_ImagesNotifier.new);
+final _hasOfferProvider =
+    NotifierProvider.autoDispose<_BoolNotifier, bool>(_BoolNotifier.new);
 final _offerTypeProvider =
-    StateProvider.autoDispose<OfferType?>((ref) => null);
+    NotifierProvider.autoDispose<_OfferTypeNotifier, OfferType?>(_OfferTypeNotifier.new);
 // Duration index: 0=15min, 1=30min, 2=60min, 3=custom
 final _offerDurationIndexProvider =
-    StateProvider.autoDispose<int>((ref) => 1);
+    NotifierProvider.autoDispose<_IntNotifier, int>(_IntNotifier.new);
 final _customDurationProvider =
-    StateProvider.autoDispose<String>((ref) => '');
+    NotifierProvider.autoDispose<_StringNotifier, String>(_StringNotifier.new);
 final _discountPercentProvider =
-    StateProvider.autoDispose<String>((ref) => '');
+    NotifierProvider.autoDispose<_StringNotifier, String>(_StringNotifier.new);
 final _specialPriceProvider =
-    StateProvider.autoDispose<String>((ref) => '');
+    NotifierProvider.autoDispose<_StringNotifier, String>(_StringNotifier.new);
 final _isUploadingProvider =
-    StateProvider.autoDispose<bool>((ref) => false);
+    NotifierProvider.autoDispose<_BoolNotifier, bool>(_BoolNotifier.new);
+final _extrasProvider =
+    NotifierProvider.autoDispose<_ExtrasNotifier, List<PostExtra>>(_ExtrasNotifier.new);
 
 final _formValidProvider = Provider.autoDispose<bool>((ref) {
   final title = ref.watch(_titleProvider);
@@ -139,8 +189,9 @@ class CreatePostPage extends ConsumerWidget {
     final customDuration = ref.read(_customDurationProvider);
     final discountPctText = ref.read(_discountPercentProvider);
     final specialPriceText = ref.read(_specialPriceProvider);
+    final extras = ref.read(_extrasProvider);
 
-    ref.read(_isUploadingProvider.notifier).state = true;
+    ref.read(_isUploadingProvider.notifier).update(true);
 
     try {
       // ── Upload images to Cloudinary ──────────────────────────────────
@@ -198,6 +249,7 @@ class CreatePostPage extends ConsumerWidget {
         offerExpiresAt: offerExpiresAt,
         createdAt: DateTime.now(),
         isActive: !draft,
+        extras: extras,
       );
 
       await FirebaseFirestore.instance
@@ -226,7 +278,7 @@ class CreatePostPage extends ConsumerWidget {
         ),
       );
     } finally {
-      ref.read(_isUploadingProvider.notifier).state = false;
+      ref.read(_isUploadingProvider.notifier).update(false);
     }
   }
 }
@@ -292,7 +344,7 @@ class _FormBody extends ConsumerWidget {
         TextFormField(
           style: AppTextStyles.body.copyWith(color: AppColors.textPrimary),
           onChanged: (v) =>
-              ref.read(_titleProvider.notifier).state = v,
+              ref.read(_titleProvider.notifier).update(v),
           maxLength: 60,
           textCapitalization: TextCapitalization.sentences,
           decoration: const InputDecoration(counterText: ''),
@@ -305,7 +357,7 @@ class _FormBody extends ConsumerWidget {
         TextFormField(
           style: AppTextStyles.body.copyWith(color: AppColors.textPrimary),
           onChanged: (v) =>
-              ref.read(_descriptionProvider.notifier).state = v,
+              ref.read(_descriptionProvider.notifier).update(v),
           maxLines: 3,
           maxLength: 200,
           textCapitalization: TextCapitalization.sentences,
@@ -326,7 +378,7 @@ class _FormBody extends ConsumerWidget {
                     style: AppTextStyles.body
                         .copyWith(color: AppColors.textPrimary),
                     onChanged: (v) =>
-                        ref.read(_priceProvider.notifier).state = v,
+                        ref.read(_priceProvider.notifier).update(v),
                     keyboardType: const TextInputType.numberWithOptions(
                         decimal: true),
                     inputFormatters: [
@@ -373,9 +425,9 @@ class _FormBody extends ConsumerWidget {
             value: hasOffer,
             activeThumbColor: AppColors.accentGold,
             onChanged: (v) {
-              ref.read(_hasOfferProvider.notifier).state = v;
+              ref.read(_hasOfferProvider.notifier).update(v);
               if (!v) {
-                ref.read(_offerTypeProvider.notifier).state = null;
+                ref.read(_offerTypeProvider.notifier).update(null);
               }
             },
           ),
@@ -400,7 +452,7 @@ class _FormBody extends ConsumerWidget {
             style:
                 AppTextStyles.body.copyWith(color: AppColors.textPrimary),
             onChanged: (v) =>
-                ref.read(_discountPercentProvider.notifier).state = v,
+                ref.read(_discountPercentProvider.notifier).update(v),
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             decoration: const InputDecoration(
@@ -417,7 +469,7 @@ class _FormBody extends ConsumerWidget {
             style:
                 AppTextStyles.body.copyWith(color: AppColors.textPrimary),
             onChanged: (v) =>
-                ref.read(_specialPriceProvider.notifier).state = v,
+                ref.read(_specialPriceProvider.notifier).update(v),
             keyboardType: const TextInputType.numberWithOptions(
                 decimal: true),
             inputFormatters: [
@@ -430,6 +482,11 @@ class _FormBody extends ConsumerWidget {
             ),
           ),
         ],
+
+        const SizedBox(height: 24),
+
+        // ── Extras / condiments ───────────────────────────────────────
+        const _ExtrasPanel(),
       ],
     );
   }
@@ -503,7 +560,7 @@ class _MediaGrid extends ConsumerWidget {
                         final list =
                             List<Uint8List>.from(ref.read(_mediaImagesProvider));
                         list.removeAt(idx);
-                        ref.read(_mediaImagesProvider.notifier).state = list;
+                        ref.read(_mediaImagesProvider.notifier).update(list);
                       },
                       child: Container(
                         padding: const EdgeInsets.all(2),
@@ -533,7 +590,7 @@ class _MediaGrid extends ConsumerWidget {
             List<Uint8List>.from(ref.read(_mediaImagesProvider));
         if (list.length < 5) {
           list.add(bytes);
-          ref.read(_mediaImagesProvider.notifier).state = list;
+          ref.read(_mediaImagesProvider.notifier).update(list);
         }
       }
     } catch (_) {}
@@ -559,7 +616,7 @@ class _CategoryDropdown extends ConsumerWidget {
         DropdownMenuItem(value: 'otros', child: Text('Otros')),
       ],
       onChanged: (v) {
-        if (v != null) ref.read(_categoryProvider.notifier).state = v;
+        if (v != null) ref.read(_categoryProvider.notifier).update(v);
       },
     );
   }
@@ -618,8 +675,7 @@ class _OfferDetails extends ConsumerWidget {
                   label: Text(_durationLabel(i)),
                   selected: durationIndex == i,
                   onSelected: (_) =>
-                      ref.read(_offerDurationIndexProvider.notifier).state =
-                          i,
+                      ref.read(_offerDurationIndexProvider.notifier).update(i),
                   selectedColor: AppColors.accentGold,
                   backgroundColor: AppColors.bgCard,
                   labelStyle: AppTextStyles.caption.copyWith(
@@ -645,7 +701,7 @@ class _OfferDetails extends ConsumerWidget {
                 style: AppTextStyles.body
                     .copyWith(color: AppColors.textPrimary),
                 onChanged: (v) =>
-                    ref.read(_customDurationProvider.notifier).state = v,
+                    ref.read(_customDurationProvider.notifier).update(v),
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: const InputDecoration(
@@ -691,8 +747,7 @@ class _OfferTypeChip extends ConsumerWidget {
       label: Text(label),
       selected: selected,
       onSelected: (_) =>
-          ref.read(_offerTypeProvider.notifier).state =
-              selected ? null : type,
+          ref.read(_offerTypeProvider.notifier).update(selected ? null : type),
       selectedColor: AppColors.accentGold,
       backgroundColor: AppColors.bgCard,
       labelStyle: AppTextStyles.caption.copyWith(
@@ -700,6 +755,298 @@ class _OfferTypeChip extends ConsumerWidget {
       ),
       side: BorderSide(
         color: selected ? AppColors.accentGold : AppColors.borderOverlay,
+      ),
+    );
+  }
+}
+
+// ── Extras panel ───────────────────────────────────────────────────────────
+
+class _GroupState {
+  final String id;
+  final TextEditingController labelController;
+  final List<TextEditingController> optionControllers;
+  bool isMultiple;
+
+  _GroupState({required this.id})
+      : labelController = TextEditingController(),
+        optionControllers = [
+          TextEditingController(),
+          TextEditingController(),
+        ],
+        isMultiple = false;
+
+  void addOption() =>
+      optionControllers.add(TextEditingController());
+
+  void removeOption(int i) {
+    optionControllers[i].dispose();
+    optionControllers.removeAt(i);
+  }
+
+  void dispose() {
+    labelController.dispose();
+    for (final c in optionControllers) {
+      c.dispose();
+    }
+  }
+}
+
+class _ExtrasPanel extends ConsumerStatefulWidget {
+  const _ExtrasPanel();
+
+  @override
+  ConsumerState<_ExtrasPanel> createState() => _ExtrasPanelState();
+}
+
+class _ExtrasPanelState extends ConsumerState<_ExtrasPanel> {
+  final List<_GroupState> _groups = [];
+  int _nextId = 0;
+
+  @override
+  void dispose() {
+    for (final g in _groups) {
+      g.dispose();
+    }
+    super.dispose();
+  }
+
+  void _syncProvider() {
+    ref.read(_extrasProvider.notifier).update(_groups
+        .map((g) => PostExtra(
+              id: g.id,
+              label: g.labelController.text.trim(),
+              isMultiple: g.isMultiple,
+              options: g.optionControllers
+                  .map((c) => c.text.trim())
+                  .where((s) => s.isNotEmpty)
+                  .toList(),
+            ))
+        .where((e) => e.label.isNotEmpty && e.options.isNotEmpty)
+        .toList());
+  }
+
+  void _addGroup() {
+    setState(() {
+      _groups.add(_GroupState(id: 'extra_${_nextId++}'));
+    });
+  }
+
+  void _removeGroup(int i) {
+    setState(() {
+      _groups[i].dispose();
+      _groups.removeAt(i);
+    });
+    _syncProvider();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'PERSONALIZACIONES',
+              style: AppTextStyles.caption
+                  .copyWith(color: AppColors.textSecondary),
+            ),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: _addGroup,
+              icon: const Icon(Icons.add, size: 16,
+                  color: AppColors.accentGold),
+              label: Text('Agregar grupo',
+                  style: AppTextStyles.caption
+                      .copyWith(color: AppColors.accentGold)),
+              style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+            ),
+          ],
+        ),
+        if (_groups.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, bottom: 4),
+            child: Text(
+              'Opcional. Agrega opciones como tamaño, salsas, extras.',
+              style: AppTextStyles.caption
+                  .copyWith(color: AppColors.textSecondary),
+            ),
+          ),
+        for (int i = 0; i < _groups.length; i++) ...[
+          const SizedBox(height: 12),
+          _GroupCard(
+            group: _groups[i],
+            onRemove: () => _removeGroup(i),
+            onChanged: _syncProvider,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _GroupCard extends StatefulWidget {
+  final _GroupState group;
+  final VoidCallback onRemove;
+  final VoidCallback onChanged;
+
+  const _GroupCard({
+    required this.group,
+    required this.onRemove,
+    required this.onChanged,
+  });
+
+  @override
+  State<_GroupCard> createState() => _GroupCardState();
+}
+
+class _GroupCardState extends State<_GroupCard> {
+  @override
+  Widget build(BuildContext context) {
+    final g = widget.group;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderOverlay),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Label + delete ──────────────────────────────────────────
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: g.labelController,
+                  onChanged: (_) => widget.onChanged(),
+                  style: AppTextStyles.body
+                      .copyWith(color: AppColors.textPrimary),
+                  decoration: InputDecoration(
+                    hintText: 'Nombre del grupo (ej: Tamaño)',
+                    hintStyle: AppTextStyles.body
+                        .copyWith(color: AppColors.textSecondary),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 0, vertical: 8),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(
+                          color: AppColors.accentGold.withValues(alpha: 0.5)),
+                    ),
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline,
+                    color: AppColors.error, size: 18),
+                onPressed: widget.onRemove,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // ── Single / multiple toggle ─────────────────────────────────
+          Row(
+            children: [
+              Text('Selección múltiple',
+                  style: AppTextStyles.caption
+                      .copyWith(color: AppColors.textSecondary)),
+              const Spacer(),
+              Switch(
+                value: g.isMultiple,
+                activeThumbColor: AppColors.accentGold,
+                onChanged: (v) {
+                  setState(() => g.isMultiple = v);
+                  widget.onChanged();
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // ── Options ──────────────────────────────────────────────────
+          Text('Opciones',
+              style: AppTextStyles.caption
+                  .copyWith(color: AppColors.textSecondary)),
+          const SizedBox(height: 6),
+          for (int j = 0; j < g.optionControllers.length; j++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: g.optionControllers[j],
+                      onChanged: (_) => widget.onChanged(),
+                      style: AppTextStyles.body
+                          .copyWith(color: AppColors.textPrimary),
+                      decoration: InputDecoration(
+                        hintText: 'Opción ${j + 1}',
+                        hintStyle: AppTextStyles.caption
+                            .copyWith(color: AppColors.textSecondary),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 8),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide:
+                              BorderSide(color: AppColors.borderOverlay),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide:
+                              BorderSide(color: AppColors.borderOverlay),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(
+                              color:
+                                  AppColors.accentGold.withValues(alpha: 0.6)),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (g.optionControllers.length > 2) ...[
+                    const SizedBox(width: 6),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() => g.removeOption(j));
+                        widget.onChanged();
+                      },
+                      child: const Icon(Icons.remove_circle_outline,
+                          color: AppColors.error, size: 18),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+          // ── Add option ───────────────────────────────────────────────
+          TextButton.icon(
+            onPressed: () {
+              setState(() => g.addOption());
+            },
+            icon: const Icon(Icons.add, size: 14,
+                color: AppColors.textSecondary),
+            label: Text('Agregar opción',
+                style: AppTextStyles.caption
+                    .copyWith(color: AppColors.textSecondary)),
+            style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+          ),
+        ],
       ),
     );
   }

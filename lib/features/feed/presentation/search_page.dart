@@ -85,7 +85,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                             color: AppColors.textSecondary, size: 18),
                         onPressed: () {
                           _ctrl.clear();
-                          ref.read(searchQueryProvider.notifier).state = '';
+                          ref.read(searchQueryProvider.notifier).update('');
                         },
                       )
                     : null,
@@ -97,7 +97,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                     horizontal: 16, vertical: 10),
               ),
               onChanged: (v) =>
-                  ref.read(searchQueryProvider.notifier).state = v,
+                  ref.read(searchQueryProvider.notifier).update(v),
             ),
           ),
         ),
@@ -139,9 +139,9 @@ class _InitialState extends ConsumerWidget {
               icon: cat.icon,
               label: cat.label,
               onTap: () {
-                ref.read(searchQueryProvider.notifier).state = cat.id == 'todos'
+                ref.read(searchQueryProvider.notifier).update(cat.id == 'todos'
                     ? ''
-                    : cat.label.toLowerCase();
+                    : cat.label.toLowerCase());
               },
             );
           }).toList(),
@@ -285,7 +285,7 @@ class _VendorChip extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return GestureDetector(
       onTap: () =>
-          ref.read(searchQueryProvider.notifier).state = vendor.displayName,
+          ref.read(searchQueryProvider.notifier).update(vendor.displayName),
       child: SizedBox(
         width: 72,
         child: Column(

@@ -50,7 +50,7 @@ class OrderConfirmedPage extends ConsumerWidget {
 
                   // ── Title ───────────────────────────────────────────
                   Text(
-                    '¡Pedido confirmado!',
+                    '¡Solicitud enviada!',
                     style: AppTextStyles.h2
                         .copyWith(color: AppColors.textPrimary),
                     textAlign: TextAlign.center,
@@ -60,10 +60,8 @@ class OrderConfirmedPage extends ConsumerWidget {
                   // ── Subtitle ────────────────────────────────────────
                   Text(
                     vendorName.isNotEmpty
-                        ? '$vendorName está preparando tu pedido. '
-                            'Te avisamos en el chat cuando salga.'
-                        : 'Tu pedido está siendo preparado. '
-                            'Te avisamos en el chat cuando salga.',
+                        ? '$vendorName revisará tu solicitud y te avisará si puede aceptarla.'
+                        : 'El vendedor revisará tu pedido y te avisará por el chat.',
                     style: AppTextStyles.body
                         .copyWith(color: AppColors.textSecondary),
                     textAlign: TextAlign.center,
@@ -137,13 +135,9 @@ class OrderConfirmedPage extends ConsumerWidget {
                   TextButton(
                     onPressed: () {
                       // Clear order state before leaving
-                      ref
-                          .read(currentOrderProvider.notifier)
-                          .state = null;
+                      ref.read(currentOrderProvider.notifier).update(null);
                       ref.read(paymentProvider.notifier).reset();
-                      ref
-                          .read(confirmedOrderIdProvider.notifier)
-                          .state = null;
+                      ref.read(confirmedOrderIdProvider.notifier).update(null);
                       context.go('/home');
                     },
                     child: Text(

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../chat/providers/chat_controller.dart';
 import '../../chat/providers/chat_provider.dart';
 import '../domain/order_model.dart';
+import '../providers/payment_provider.dart';
 
 // ── Page ───────────────────────────────────────────────────────────────────
 
@@ -162,6 +164,25 @@ class _OrderDetailBody extends ConsumerWidget {
                       Text(order.deliveryNote,
                           style: AppTextStyles.body
                               .copyWith(color: AppColors.textPrimary)),
+                      if (order.deliveryImageUrl != null &&
+                          order.deliveryImageUrl!.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: CachedNetworkImage(
+                            imageUrl: order.deliveryImageUrl!,
+                            width: 120,
+                            height: 120,
+                            fit: BoxFit.cover,
+                            placeholder: (_, _) => Container(
+                                color: AppColors.bgSurface,
+                                width: 120,
+                                height: 120),
+                            errorWidget: (_, _, _) =>
+                                const SizedBox.shrink(),
+                          ),
+                        ),
+                      ],
                     ],
                   ],
                 ),
@@ -219,6 +240,8 @@ class _StatusBanner extends StatelessWidget {
     final (label, color, icon) = switch (status) {
       OrderStatus.pending =>
         ('Esperando confirmación del vendedor', AppColors.accentGold, Icons.hourglass_empty_outlined),
+      OrderStatus.awaiting_payment =>
+        ('Aceptado — pendiente de pago', AppColors.accentGold, Icons.payment_outlined),
       OrderStatus.confirmed =>
         ('Confirmado — en preparación', AppColors.success, Icons.check_circle_outline),
       OrderStatus.delivered =>
@@ -262,7 +285,6 @@ class _ActionsSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // ── Vendor actions ──────────────────────────────────────────────────────
     if (isVendor) {
-      // Pending: confirm or reject
       if (order.status == OrderStatus.pending) {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -275,15 +297,14 @@ class _ActionsSection extends ConsumerWidget {
                 final ok = await _confirmDialog(
                   context,
                   title: '¿Aceptar pedido?',
-                  body:
-                      'El comprador será notificado y el chat quedará activo.',
+                  body: 'El comprador será notificado para proceder al pago.',
                   confirmLabel: 'Aceptar',
                   confirmColor: AppColors.success,
                 );
                 if (ok && context.mounted) {
                   await ref
                       .read(chatControllerProvider)
-                      .confirmOrder(order.id);
+                      .confirmOrder(order);
                   if (context.mounted) context.push('/chat/${order.id}');
                 }
               },
@@ -305,7 +326,7 @@ class _ActionsSection extends ConsumerWidget {
                 if (ok && context.mounted) {
                   await ref
                       .read(chatControllerProvider)
-                      .rejectOrder(order.id);
+                      .rejectOrder(order);
                   if (context.mounted) context.pop();
                 }
               },
@@ -314,7 +335,6 @@ class _ActionsSection extends ConsumerWidget {
         );
       }
 
-      // Confirmed: go to chat OR mark delivered
       if (order.status == OrderStatus.confirmed) {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -355,6 +375,18 @@ class _ActionsSection extends ConsumerWidget {
 
     // ── Buyer actions ───────────────────────────────────────────────────────
     if (!isVendor) {
+      if (order.status == OrderStatus.awaiting_payment) {
+        return _ActionButton(
+          label:
+              'Proceder al pago — \$${order.finalPrice.toStringAsFixed(order.finalPrice % 1 == 0 ? 0 : 2)}',
+          icon: Icons.payment_outlined,
+          color: AppColors.accentGold,
+          onTap: () {
+            ref.read(pendingPaymentOrderIdProvider.notifier).update(order.id);
+            context.push('/payment');
+          },
+        );
+      }
       if (order.status == OrderStatus.pending ||
           order.status == OrderStatus.confirmed) {
         return _ActionButton(

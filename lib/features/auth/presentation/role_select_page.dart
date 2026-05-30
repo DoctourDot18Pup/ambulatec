@@ -7,10 +7,16 @@ import '../data/auth_controller.dart';
 
 // ── Providers ─────────────────────────────────────────────────────────────
 
+class _BoolNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+  void update(bool value) => state = value;
+}
+
 final _buyerSelectedProvider =
-    StateProvider.autoDispose<bool>((ref) => false);
+    NotifierProvider.autoDispose<_BoolNotifier, bool>(_BoolNotifier.new);
 final _vendorSelectedProvider =
-    StateProvider.autoDispose<bool>((ref) => false);
+    NotifierProvider.autoDispose<_BoolNotifier, bool>(_BoolNotifier.new);
 
 // ── Page ──────────────────────────────────────────────────────────────────
 
@@ -89,7 +95,7 @@ class RoleSelectPage extends ConsumerWidget {
                     selected: buyerSelected,
                     onTap: () => ref
                         .read(_buyerSelectedProvider.notifier)
-                        .state = !buyerSelected,
+                        .update(!buyerSelected),
                   ),
                   const SizedBox(height: 12),
 
@@ -102,7 +108,7 @@ class RoleSelectPage extends ConsumerWidget {
                     requiresVerification: true,
                     onTap: () => ref
                         .read(_vendorSelectedProvider.notifier)
-                        .state = !vendorSelected,
+                        .update(!vendorSelected),
                   ),
 
                   const Spacer(),

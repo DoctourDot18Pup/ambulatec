@@ -111,14 +111,27 @@ class OrderAlertPage extends ConsumerWidget {
 
 // ── Alert body ─────────────────────────────────────────────────────────────
 
-class _AlertBody extends ConsumerWidget {
+class _AlertBody extends ConsumerStatefulWidget {
   final OrderModel order;
   final DateTime deadline;
   const _AlertBody({required this.order, required this.deadline});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final countdownAsync = ref.watch(countdownProvider(deadline));
+  ConsumerState<_AlertBody> createState() => _AlertBodyState();
+}
+
+class _AlertBodyState extends ConsumerState<_AlertBody> {
+  late int _qty;
+
+  @override
+  void initState() {
+    super.initState();
+    _qty = widget.order.quantity;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final countdownAsync = ref.watch(countdownProvider(widget.deadline));
     final remaining = countdownAsync.asData?.value;
     final expired = remaining == Duration.zero;
 
@@ -132,21 +145,36 @@ class _AlertBody extends ConsumerWidget {
           const SizedBox(height: 20),
 
           // ── Product card ─────────────────────────────────────────
-          _ProductCard(order: order),
+          _ProductCard(
+            order: widget.order,
+            qty: _qty,
+            onQtyChanged: (q) => setState(() => _qty = q),
+          ),
           const SizedBox(height: 16),
 
           // ── Buyer card ───────────────────────────────────────────
-          _BuyerCard(order: order),
+          _BuyerCard(order: widget.order),
           const SizedBox(height: 16),
 
+          // ── Selected extras ──────────────────────────────────────
+          if (widget.order.selectedExtras.isNotEmpty) ...[
+            _ExtrasCard(selectedExtras: widget.order.selectedExtras),
+            const SizedBox(height: 16),
+          ],
+
           // ── Delivery card ────────────────────────────────────────
-          if (order.deliveryNote.isNotEmpty)
-            _DeliveryCard(note: order.deliveryNote),
-          if (order.deliveryNote.isNotEmpty) const SizedBox(height: 24),
+          if (widget.order.deliveryNote.isNotEmpty)
+            _DeliveryCard(
+              note: widget.order.deliveryNote,
+              imageUrl: widget.order.deliveryImageUrl,
+            ),
+          if (widget.order.deliveryNote.isNotEmpty)
+            const SizedBox(height: 24),
 
           // ── Action buttons ───────────────────────────────────────
           _ActionRow(
-            order: order,
+            order: widget.order,
+            adjustedQty: _qty,
             disabled: expired,
           ),
         ],
@@ -215,10 +243,17 @@ class _CountdownChip extends StatelessWidget {
 
 class _ProductCard extends StatelessWidget {
   final OrderModel order;
-  const _ProductCard({required this.order});
+  final int qty;
+  final void Function(int) onQtyChanged;
+  const _ProductCard({
+    required this.order,
+    required this.qty,
+    required this.onQtyChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final adjustedTotal = order.originalPrice * qty;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -226,72 +261,135 @@ class _ProductCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.borderOverlay),
       ),
-      child: Row(
+      child: Column(
         children: [
-          // Thumbnail
-          if (order.postMediaUrls.isNotEmpty)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: CachedNetworkImage(
-                imageUrl: order.postMediaUrls.first,
-                width: 64,
-                height: 64,
-                fit: BoxFit.cover,
-                placeholder: (_, _) =>
-                    Container(color: AppColors.bgSurface, width: 64, height: 64),
-                errorWidget: (_, _, _) => Container(
-                  color: AppColors.bgSurface,
-                  width: 64,
-                  height: 64,
-                  child: const Icon(Icons.image_not_supported_outlined,
-                      color: AppColors.textSecondary),
-                ),
-              ),
-            ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(order.postTitle,
-                    style: AppTextStyles.body
-                        .copyWith(color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w600),
-                    overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 4),
-                Text('Cantidad: ${order.quantity}',
-                    style: AppTextStyles.caption
-                        .copyWith(color: AppColors.textSecondary)),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Price
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          Row(
             children: [
-              Text(
-                '\$${order.finalPrice.toStringAsFixed(order.finalPrice % 1 == 0 ? 0 : 2)}',
-                style: AppTextStyles.h3
-                    .copyWith(color: AppColors.accentGold),
-              ),
-              if (order.offerApplied)
-                Container(
-                  margin: const EdgeInsets.only(top: 2),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color:
-                        AppColors.accentGold.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
+              // Thumbnail
+              if (order.postMediaUrls.isNotEmpty)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: CachedNetworkImage(
+                    imageUrl: order.postMediaUrls.first,
+                    width: 64,
+                    height: 64,
+                    fit: BoxFit.cover,
+                    placeholder: (_, _) => Container(
+                        color: AppColors.bgSurface, width: 64, height: 64),
+                    errorWidget: (_, _, _) => Container(
+                      color: AppColors.bgSurface,
+                      width: 64,
+                      height: 64,
+                      child: const Icon(Icons.image_not_supported_outlined,
+                          color: AppColors.textSecondary),
+                    ),
                   ),
-                  child: Text('Oferta',
-                      style: AppTextStyles.caption.copyWith(
-                          color: AppColors.accentGold)),
                 ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(order.postTitle,
+                        style: AppTextStyles.body.copyWith(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w600),
+                        overflow: TextOverflow.ellipsis),
+                    if (qty != order.quantity) ...[
+                      const SizedBox(height: 2),
+                      Text('Solicitado: ${order.quantity}',
+                          style: AppTextStyles.caption
+                              .copyWith(color: AppColors.textSecondary)),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '\$${adjustedTotal.toStringAsFixed(adjustedTotal % 1 == 0 ? 0 : 2)}',
+                    style: AppTextStyles.h3
+                        .copyWith(color: AppColors.accentGold),
+                  ),
+                  if (order.offerApplied)
+                    Container(
+                      margin: const EdgeInsets.only(top: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.accentGold.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text('Oferta',
+                          style: AppTextStyles.caption
+                              .copyWith(color: AppColors.accentGold)),
+                    ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(color: AppColors.borderOverlay, height: 1),
+          const SizedBox(height: 10),
+          // ── Quantity stepper ──────────────────────────────────
+          Row(
+            children: [
+              Text('CANTIDAD',
+                  style: AppTextStyles.caption
+                      .copyWith(color: AppColors.textSecondary)),
+              const Spacer(),
+              _QtyBtn(
+                icon: Icons.remove,
+                enabled: qty > 1,
+                onTap: () => onQtyChanged(qty - 1),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text('$qty',
+                    style: AppTextStyles.h3
+                        .copyWith(color: AppColors.textPrimary)),
+              ),
+              _QtyBtn(
+                icon: Icons.add,
+                enabled: qty < 99,
+                onTap: () => onQtyChanged(qty + 1),
+              ),
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _QtyBtn extends StatelessWidget {
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback onTap;
+  const _QtyBtn(
+      {required this.icon, required this.enabled, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final color =
+        enabled ? AppColors.accentGold : AppColors.textSecondary;
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: Container(
+        padding: const EdgeInsets.all(5),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+              color: enabled
+                  ? AppColors.accentGold.withValues(alpha: 0.5)
+                  : AppColors.borderOverlay),
+          color: enabled
+              ? AppColors.accentGold.withValues(alpha: 0.1)
+              : Colors.transparent,
+        ),
+        child: Icon(icon, size: 15, color: color),
       ),
     );
   }
@@ -354,11 +452,11 @@ class _BuyerCard extends StatelessWidget {
   }
 }
 
-// ── Delivery card ──────────────────────────────────────────────────────────
+// ── Extras card ────────────────────────────────────────────────────────────
 
-class _DeliveryCard extends StatelessWidget {
-  final String note;
-  const _DeliveryCard({required this.note});
+class _ExtrasCard extends StatelessWidget {
+  final Map<String, List<String>> selectedExtras;
+  const _ExtrasCard({required this.selectedExtras});
 
   @override
   Widget build(BuildContext context) {
@@ -369,26 +467,100 @@ class _DeliveryCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.borderOverlay),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.location_on_outlined,
-              color: AppColors.accentGold, size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Punto de entrega',
-                    style: AppTextStyles.caption
-                        .copyWith(color: AppColors.textSecondary)),
-                const SizedBox(height: 4),
-                Text(note,
-                    style: AppTextStyles.body
-                        .copyWith(color: AppColors.textPrimary)),
-              ],
-            ),
+          const Row(
+            children: [
+              Icon(Icons.tune_outlined,
+                  size: 14, color: AppColors.textSecondary),
+              SizedBox(width: 6),
+              Text('PERSONALIZACIONES',
+                  style: TextStyle(
+                      color: AppColors.textSecondary, fontSize: 11)),
+            ],
           ),
+          const SizedBox(height: 8),
+          ...selectedExtras.entries.map((e) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${e.key}: ',
+                        style: const TextStyle(
+                            color: AppColors.textSecondary, fontSize: 12)),
+                    Expanded(
+                      child: Text(
+                        e.value.join(', '),
+                        style: const TextStyle(
+                            color: AppColors.textPrimary, fontSize: 14),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Delivery card ──────────────────────────────────────────────────────────
+
+class _DeliveryCard extends StatelessWidget {
+  final String note;
+  final String? imageUrl;
+  const _DeliveryCard({required this.note, this.imageUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderOverlay),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.location_on_outlined,
+                  color: AppColors.accentGold, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Punto de entrega',
+                        style: AppTextStyles.caption
+                            .copyWith(color: AppColors.textSecondary)),
+                    const SizedBox(height: 4),
+                    Text(note,
+                        style: AppTextStyles.body
+                            .copyWith(color: AppColors.textPrimary)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (imageUrl != null && imageUrl!.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: CachedNetworkImage(
+                imageUrl: imageUrl!,
+                width: 100,
+                height: 100,
+                fit: BoxFit.cover,
+                placeholder: (_, _) => Container(
+                    color: AppColors.bgSurface, width: 100, height: 100),
+                errorWidget: (_, _, _) => const SizedBox.shrink(),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -399,8 +571,13 @@ class _DeliveryCard extends StatelessWidget {
 
 class _ActionRow extends ConsumerWidget {
   final OrderModel order;
+  final int adjustedQty;
   final bool disabled;
-  const _ActionRow({required this.order, required this.disabled});
+  const _ActionRow({
+    required this.order,
+    required this.adjustedQty,
+    required this.disabled,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -414,7 +591,7 @@ class _ActionRow extends ConsumerWidget {
                 : () async {
                     await ref
                         .read(chatControllerProvider)
-                        .rejectOrder(order.id);
+                        .rejectOrder(order);
                     if (context.mounted) context.go('/dashboard');
                   },
             style: OutlinedButton.styleFrom(
@@ -438,7 +615,7 @@ class _ActionRow extends ConsumerWidget {
                 : () async {
                     await ref
                         .read(chatControllerProvider)
-                        .confirmOrder(order.id);
+                        .confirmOrder(order, quantity: adjustedQty);
                     if (context.mounted) {
                       context.go('/chat/${order.id}');
                     }

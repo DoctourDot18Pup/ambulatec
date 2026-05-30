@@ -12,6 +12,9 @@ class ReviewModel {
   final String buyerName;
   final String buyerPhotoUrl;
 
+  /// Title of the ordered post (stored for vendor detail view).
+  final String postTitle;
+
   /// Star rating between 1 and 5.
   final int rating;
 
@@ -30,6 +33,7 @@ class ReviewModel {
     required this.buyerId,
     required this.buyerName,
     required this.buyerPhotoUrl,
+    this.postTitle = '',
     required this.rating,
     required this.tags,
     this.comment,
@@ -44,6 +48,7 @@ class ReviewModel {
         'buyerId': buyerId,
         'buyerName': buyerName,
         'buyerPhotoUrl': buyerPhotoUrl,
+        if (postTitle.isNotEmpty) 'postTitle': postTitle,
         'rating': rating,
         'tags': tags,
         if (comment != null && comment!.isNotEmpty) 'comment': comment,
@@ -58,6 +63,7 @@ class ReviewModel {
       buyerId: map['buyerId'] as String? ?? '',
       buyerName: map['buyerName'] as String? ?? '',
       buyerPhotoUrl: map['buyerPhotoUrl'] as String? ?? '',
+      postTitle: map['postTitle'] as String? ?? '',
       rating: map['rating'] as int? ?? 0,
       tags: List<String>.from(map['tags'] as List? ?? []),
       comment: map['comment'] as String?,

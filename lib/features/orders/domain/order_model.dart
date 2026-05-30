@@ -4,7 +4,8 @@ import '../../../core/constants/app_constants.dart';
 
 // ── Enums ──────────────────────────────────────────────────────────────────
 
-enum OrderStatus { pending, confirmed, delivered, cancelled, rejected }
+// ignore: constant_identifier_names
+enum OrderStatus { pending, awaiting_payment, confirmed, delivered, cancelled, rejected }
 
 // ── Model ──────────────────────────────────────────────────────────────────
 
@@ -29,6 +30,9 @@ class OrderModel {
   final DateTime? confirmedAt;
   final DateTime? deliveredAt;
   final DateTime chatExpiresAt;
+  final Map<String, List<String>> selectedExtras;
+  final DateTime? deliveryDeadlineAt;
+  final bool isFlagged;
 
   const OrderModel({
     required this.id,
@@ -51,6 +55,9 @@ class OrderModel {
     this.confirmedAt,
     this.deliveredAt,
     required this.chatExpiresAt,
+    this.selectedExtras = const {},
+    this.deliveryDeadlineAt,
+    this.isFlagged = false,
   });
 
   // ── Factory ────────────────────────────────────────────────────────────────
@@ -107,6 +114,15 @@ class OrderModel {
       deliveredAt: parseDateOptional(map['deliveredAt']),
       chatExpiresAt: parseDateOptional(map['chatExpiresAt']) ??
           createdAt.add(Duration(hours: AppConstants.chatExpirationHours)),
+      selectedExtras: (map['selectedExtras'] as Map?)?.map(
+            (k, v) => MapEntry(
+              k as String,
+              List<String>.from(v as List? ?? []),
+            ),
+          ) ??
+          {},
+      deliveryDeadlineAt: parseDateOptional(map['deliveryDeadlineAt']),
+      isFlagged: map['isFlagged'] as bool? ?? false,
     );
   }
 
@@ -134,6 +150,10 @@ class OrderModel {
         if (deliveredAt != null)
           'deliveredAt': Timestamp.fromDate(deliveredAt!),
         'chatExpiresAt': Timestamp.fromDate(chatExpiresAt),
+        if (selectedExtras.isNotEmpty) 'selectedExtras': selectedExtras,
+        if (deliveryDeadlineAt != null)
+          'deliveryDeadlineAt': Timestamp.fromDate(deliveryDeadlineAt!),
+        'isFlagged': isFlagged,
       };
 
   // ── copyWith ───────────────────────────────────────────────────────────────
@@ -159,6 +179,9 @@ class OrderModel {
     DateTime? confirmedAt,
     DateTime? deliveredAt,
     DateTime? chatExpiresAt,
+    Map<String, List<String>>? selectedExtras,
+    DateTime? deliveryDeadlineAt,
+    bool? isFlagged,
   }) {
     return OrderModel(
       id: id ?? this.id,
@@ -181,6 +204,9 @@ class OrderModel {
       confirmedAt: confirmedAt ?? this.confirmedAt,
       deliveredAt: deliveredAt ?? this.deliveredAt,
       chatExpiresAt: chatExpiresAt ?? this.chatExpiresAt,
+      selectedExtras: selectedExtras ?? this.selectedExtras,
+      deliveryDeadlineAt: deliveryDeadlineAt ?? this.deliveryDeadlineAt,
+      isFlagged: isFlagged ?? this.isFlagged,
     );
   }
 }

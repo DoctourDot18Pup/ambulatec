@@ -10,6 +10,7 @@ import '../../features/auth/presentation/login_page.dart';
 import '../../features/auth/presentation/role_select_page.dart';
 import '../../features/vendor/presentation/vendor_verify_page.dart';
 import '../../features/feed/presentation/home_page.dart';
+import '../../features/feed/presentation/vendors_page.dart';
 import '../../features/vendor/presentation/dashboard_page.dart';
 import '../../features/feed/presentation/post_detail_page.dart';
 import '../../features/vendor/presentation/create_post_page.dart';
@@ -26,6 +27,8 @@ import '../../features/feed/presentation/search_page.dart';
 import '../../features/vendor/presentation/earnings_page.dart';
 import '../../features/profile/presentation/vendor_profile_page.dart';
 import '../../features/orders/presentation/order_detail_page.dart';
+import '../../features/profile/presentation/my_reviews_page.dart';
+import '../../features/profile/presentation/notification_settings_page.dart';
 
 // ── Router notifier ────────────────────────────────────────────────────────
 
@@ -130,7 +133,7 @@ class RouterNotifier extends ChangeNotifier {
 
 
 final routerNotifierProvider =
-    ChangeNotifierProvider<RouterNotifier>((ref) => RouterNotifier(ref));
+    Provider<RouterNotifier>((ref) => RouterNotifier(ref));
 final routerProvider = Provider<GoRouter>((ref) {
   final notifier = ref.read(routerNotifierProvider);
   return GoRouter(
@@ -167,6 +170,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/home',
         name: 'home',
         builder: (context, state) => const HomePage(),
+      ),
+      GoRoute(
+        path: '/vendors',
+        name: 'vendors',
+        builder: (context, state) => const VendorsPage(),
       ),
       GoRoute(
         path: '/dashboard',
@@ -259,6 +267,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => OrderDetailPage(
           orderId: state.pathParameters['orderId']!,
         ),
+      ),
+      GoRoute(
+        path: '/my-reviews',
+        name: 'myReviews',
+        builder: (context, state) => const MyReviewsPage(),
+      ),
+      GoRoute(
+        path: '/notifications',
+        name: 'notifications',
+        builder: (context, state) => const NotificationSettingsPage(),
       ),
     ],
   );

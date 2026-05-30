@@ -22,37 +22,20 @@ class _NavItem {
   });
 }
 
-const _navItems = [
-  _NavItem(
-    icon: Icons.home_outlined,
-    activeIcon: Icons.home,
-    label: 'Inicio',
-    route: '/home',
-  ),
-  _NavItem(
-    icon: Icons.storefront_outlined,
-    activeIcon: Icons.storefront,
-    label: 'Dashboard',
-    route: '/dashboard',
-  ),
-  _NavItem(
-    icon: Icons.search_outlined,
-    activeIcon: Icons.search,
-    label: 'Buscar',
-    route: '/search',
-  ),
-  _NavItem(
-    icon: Icons.receipt_long_outlined,
-    activeIcon: Icons.receipt_long,
-    label: 'Pedidos',
-    route: '/orders',
-  ),
-  _NavItem(
-    icon: Icons.person_outline,
-    activeIcon: Icons.person,
-    label: 'Perfil',
-    route: '/profile',
-  ),
+const _vendorNavItems = [
+  _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Inicio', route: '/home'),
+  _NavItem(icon: Icons.storefront_outlined, activeIcon: Icons.storefront, label: 'Dashboard', route: '/dashboard'),
+  _NavItem(icon: Icons.search_outlined, activeIcon: Icons.search, label: 'Buscar', route: '/search'),
+  _NavItem(icon: Icons.receipt_long_outlined, activeIcon: Icons.receipt_long, label: 'Pedidos', route: '/orders'),
+  _NavItem(icon: Icons.person_outline, activeIcon: Icons.person, label: 'Perfil', route: '/profile'),
+];
+
+const _buyerNavItems = [
+  _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Inicio', route: '/home'),
+  _NavItem(icon: Icons.people_outline, activeIcon: Icons.people, label: 'Vendedores', route: '/vendors'),
+  _NavItem(icon: Icons.search_outlined, activeIcon: Icons.search, label: 'Buscar', route: '/search'),
+  _NavItem(icon: Icons.receipt_long_outlined, activeIcon: Icons.receipt_long, label: 'Pedidos', route: '/orders'),
+  _NavItem(icon: Icons.person_outline, activeIcon: Icons.person, label: 'Perfil', route: '/profile'),
 ];
 
 // ── AdaptiveScaffold ───────────────────────────────────────────────────────
@@ -79,13 +62,13 @@ class AdaptiveScaffold extends ConsumerWidget {
     this.showVendorFab = false,
   });
 
-  void _onTap(BuildContext context, int index) {
-    final route = _navItems[index].route;
-    context.go(route);
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final userModel = ref.watch(userProvider).asData?.value;
+    final navItems = (userModel?.roles.contains('vendor') ?? false)
+        ? _vendorNavItems
+        : _buyerNavItems;
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final isDesktop = constraints.maxWidth >= 1024;
@@ -94,13 +77,13 @@ class AdaptiveScaffold extends ConsumerWidget {
                 body: body,
                 currentIndex: currentIndex,
                 showCategoryFilter: showCategoryFilter,
-                onTap: (i) => _onTap(context, i),
+                navItems: navItems,
               )
             : _MobileLayout(
                 body: body,
                 currentIndex: currentIndex,
                 showVendorFab: showVendorFab,
-                onTap: (i) => _onTap(context, i),
+                navItems: navItems,
               );
       },
     );
@@ -113,13 +96,13 @@ class _MobileLayout extends ConsumerWidget {
   final Widget body;
   final int currentIndex;
   final bool showVendorFab;
-  final void Function(int) onTap;
+  final List<_NavItem> navItems;
 
   const _MobileLayout({
     required this.body,
     required this.currentIndex,
     required this.showVendorFab,
-    required this.onTap,
+    required this.navItems,
   });
 
   @override
@@ -140,7 +123,7 @@ class _MobileLayout extends ConsumerWidget {
           : null,
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: currentIndex,
-        onTap: onTap,
+        onTap: (index) => context.go(navItems[index].route),
         backgroundColor: AppColors.bgSurface,
         selectedItemColor: AppColors.accentGold,
         unselectedItemColor: AppColors.textSecondary,
@@ -151,7 +134,7 @@ class _MobileLayout extends ConsumerWidget {
             AppTextStyles.caption.copyWith(fontSize: 10),
         unselectedLabelStyle:
             AppTextStyles.caption.copyWith(fontSize: 10),
-        items: _navItems
+        items: navItems
             .map(
               (item) => BottomNavigationBarItem(
                 icon: Icon(item.icon),
@@ -171,13 +154,13 @@ class _DesktopLayout extends ConsumerWidget {
   final Widget body;
   final int currentIndex;
   final bool showCategoryFilter;
-  final void Function(int) onTap;
+  final List<_NavItem> navItems;
 
   const _DesktopLayout({
     required this.body,
     required this.currentIndex,
     required this.showCategoryFilter,
-    required this.onTap,
+    required this.navItems,
   });
 
   @override
@@ -194,7 +177,7 @@ class _DesktopLayout extends ConsumerWidget {
             child: _Sidebar(
               currentIndex: currentIndex,
               showCategoryFilter: showCategoryFilter,
-              onTap: onTap,
+              navItems: navItems,
               userModel: userModel,
             ),
           ),
@@ -216,13 +199,13 @@ class _DesktopLayout extends ConsumerWidget {
 class _Sidebar extends ConsumerWidget {
   final int currentIndex;
   final bool showCategoryFilter;
-  final void Function(int) onTap;
+  final List<_NavItem> navItems;
   final dynamic userModel;
 
   const _Sidebar({
     required this.currentIndex,
     required this.showCategoryFilter,
-    required this.onTap,
+    required this.navItems,
     required this.userModel,
   });
 
@@ -258,14 +241,14 @@ class _Sidebar extends ConsumerWidget {
           ),
 
           // ── Nav items ─────────────────────────────────────────────────────
-          ...List.generate(_navItems.length, (i) {
-            final item = _navItems[i];
+          ...List.generate(navItems.length, (i) {
+            final item = navItems[i];
             final selected = i == currentIndex;
             return _SidebarNavItem(
               icon: selected ? item.activeIcon : item.icon,
               label: item.label,
               selected: selected,
-              onTap: () => onTap(i),
+              onTap: () => context.go(item.route),
             );
           }),
 
@@ -287,7 +270,7 @@ class _Sidebar extends ConsumerWidget {
                 label: _categoryLabel(cat),
                 selected: isSelected,
                 onTap: () =>
-                    ref.read(categoryFilterProvider.notifier).state = cat,
+                    ref.read(categoryFilterProvider.notifier).update(cat),
               );
             }),
           ],

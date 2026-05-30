@@ -1,15 +1,26 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/constants/app_constants.dart';
+import '../../../core/services/cloudinary_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../feed/domain/post_model.dart';
+import '../domain/order_model.dart';
 import '../providers/current_order_provider.dart';
+import '../providers/payment_provider.dart';
 
-// ── Page-scoped quantity provider ──────────────────────────────────────────
+class _BoolNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+  void update(bool value) => state = value;
+}
 
-final _quantityProvider = StateProvider.autoDispose<int>((ref) => 1);
+final _submittingProvider =
+    NotifierProvider.autoDispose<_BoolNotifier, bool>(_BoolNotifier.new);
 
 // ── Page ───────────────────────────────────────────────────────────────────
 
@@ -40,13 +51,11 @@ class OrderSummaryPage extends ConsumerWidget {
         backgroundColor: AppColors.bgSurface,
         elevation: 0,
         leading: IconButton(
-          icon:
-              const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
           onPressed: () => context.go('/home'),
         ),
-        title: Text('Resumen',
-            style:
-                AppTextStyles.h3.copyWith(color: AppColors.textPrimary)),
+        title: Text('Confirmar solicitud',
+            style: AppTextStyles.h3.copyWith(color: AppColors.textPrimary)),
       );
 }
 
@@ -56,29 +65,10 @@ class _SummaryView extends ConsumerWidget {
   final OrderDraft draft;
   const _SummaryView({required this.draft});
 
-  /// Computes total considering offer type.
-  double _computeTotal(PostModel post, int quantity) {
-    if (!post.hasOffer) return post.price * quantity;
-    switch (post.offerType) {
-      case OfferType.twoForOne:
-        // Buy 2 pay for 1, e.g. quantity=3 → pay for 2.
-        return post.price * ((quantity + 1) ~/ 2);
-      default:
-        return post.price * quantity;
-    }
-  }
-
-  double _computeSubtotal(PostModel post, int quantity) {
-    return (post.originalPrice ?? post.price) * quantity;
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final post = draft.post;
-    final quantity = ref.watch(_quantityProvider);
-    final subtotal = _computeSubtotal(post, quantity);
-    final total = _computeTotal(post, quantity);
-    final discount = subtotal - total;
+    final isSubmitting = ref.watch(_submittingProvider);
 
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
@@ -86,13 +76,11 @@ class _SummaryView extends ConsumerWidget {
         backgroundColor: AppColors.bgSurface,
         elevation: 0,
         leading: IconButton(
-          icon:
-              const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
           onPressed: () => context.go('/post/${post.id}'),
         ),
-        title: Text('Resumen',
-            style:
-                AppTextStyles.h3.copyWith(color: AppColors.textPrimary)),
+        title: Text('Confirmar solicitud',
+            style: AppTextStyles.h3.copyWith(color: AppColors.textPrimary)),
       ),
       body: Stack(
         children: [
@@ -105,30 +93,26 @@ class _SummaryView extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // ── Product card ─────────────────────────────────
-                    _ProductCard(
-                      post: post,
-                      quantity: quantity,
-                      onDecrement: quantity > 1
-                          ? () => ref
-                              .read(_quantityProvider.notifier)
-                              .state--
-                          : null,
-                      onIncrement: () =>
-                          ref.read(_quantityProvider.notifier).state++,
-                    ),
+                    _ProductCard(post: post, quantity: draft.quantity),
                     const SizedBox(height: 16),
 
-                    // ── Price breakdown ──────────────────────────────
-                    _PriceBreakdown(
-                      subtotal: subtotal,
-                      discount: discount,
-                      total: total,
-                      hasOffer: post.hasOffer,
-                    ),
+                    // ── Selected extras ───────────────────────────────
+                    if (draft.selectedExtras.isNotEmpty) ...[
+                      _ExtrasCard(
+                          post: post, selectedExtras: draft.selectedExtras),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // ── Price card ─────────────────────────────────────
+                    _PriceCard(unitPrice: post.price, quantity: draft.quantity),
                     const SizedBox(height: 16),
 
                     // ── Delivery card ─────────────────────────────────
                     _DeliveryCard(draft: draft, postId: post.id),
+                    const SizedBox(height: 12),
+
+                    // ── Info note ─────────────────────────────────────
+                    _InfoNote(),
                   ],
                 ),
               ),
@@ -144,19 +128,99 @@ class _SummaryView extends ConsumerWidget {
               color: AppColors.bgPrimary,
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
               child: ElevatedButton(
-                onPressed: () {
-                  // Update quantity in draft then proceed to payment.
-                  ref.read(currentOrderProvider.notifier).state =
-                      draft.copyWith(quantity: quantity);
-                  context.go('/payment');
-                },
-                child: const Text('Proceder al pago'),
+                onPressed: isSubmitting
+                    ? null
+                    : () => _submit(context, ref, draft),
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                              AppColors.bgPrimary),
+                        ),
+                      )
+                    : const Text('Enviar solicitud al vendedor'),
               ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _submit(
+      BuildContext context, WidgetRef ref, OrderDraft draft) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    ref.read(_submittingProvider.notifier).update(true);
+    try {
+      final post = draft.post;
+      final orderRef =
+          FirebaseFirestore.instance.collection(AppConstants.ordersCollection).doc();
+
+      // Upload delivery image if provided
+      String? deliveryImageUrl;
+      if (draft.deliveryImageBytes != null) {
+        deliveryImageUrl = await CloudinaryService()
+            .uploadImage(draft.deliveryImageBytes!, 'delivery/${user.uid}');
+      }
+
+      final order = OrderModel(
+        id: orderRef.id,
+        buyerId: user.uid,
+        buyerName: user.displayName ?? '',
+        buyerPhotoUrl: user.photoURL ?? '',
+        vendorId: post.vendorId,
+        postId: post.id,
+        postTitle: post.title,
+        postMediaUrls: post.mediaUrls,
+        originalPrice: post.price,
+        finalPrice: post.price * draft.quantity,
+        quantity: draft.quantity,
+        offerApplied: post.hasOffer,
+        offerType: post.offerType,
+        deliveryNote: draft.deliveryNote,
+        deliveryImageUrl: deliveryImageUrl,
+        status: OrderStatus.pending,
+        createdAt: DateTime.now(),
+        chatExpiresAt: DateTime.now().add(const Duration(hours: 24)),
+        selectedExtras: draft.selectedExtras,
+      );
+
+      await orderRef.set(order.toMap());
+
+      // Notify vendor of new order request.
+      await FirebaseFirestore.instance
+          .collection(AppConstants.notificationsCollection)
+          .doc(orderRef.id)
+          .set({
+        'type': 'new_order',
+        'recipientId': post.vendorId,
+        'vendorId': post.vendorId,
+        'orderId': orderRef.id,
+        'buyerName': user.displayName ?? '',
+        'productTitle': post.title,
+        'status': 'unread',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      ref.read(confirmedOrderIdProvider.notifier).update(orderRef.id);
+
+      if (context.mounted) context.go('/order-confirmed');
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error al enviar solicitud: $e'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    } finally {
+      ref.read(_submittingProvider.notifier).update(false);
+    }
   }
 }
 
@@ -165,15 +229,7 @@ class _SummaryView extends ConsumerWidget {
 class _ProductCard extends StatelessWidget {
   final PostModel post;
   final int quantity;
-  final VoidCallback? onDecrement;
-  final VoidCallback onIncrement;
-
-  const _ProductCard({
-    required this.post,
-    required this.quantity,
-    required this.onDecrement,
-    required this.onIncrement,
-  });
+  const _ProductCard({required this.post, required this.quantity});
 
   @override
   Widget build(BuildContext context) {
@@ -186,7 +242,6 @@ class _ProductCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Thumbnail
           if (post.mediaUrls.isNotEmpty)
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
@@ -195,8 +250,8 @@ class _ProductCard extends StatelessWidget {
                 width: 80,
                 height: 80,
                 fit: BoxFit.cover,
-                placeholder: (_, _) => Container(
-                    color: AppColors.bgSurface, width: 80, height: 80),
+                placeholder: (_, _) =>
+                    Container(color: AppColors.bgSurface, width: 80, height: 80),
                 errorWidget: (_, _, _) => Container(
                   color: AppColors.bgSurface,
                   width: 80,
@@ -211,61 +266,27 @@ class _ProductCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  post.vendorName,
-                  style: AppTextStyles.caption
-                      .copyWith(color: AppColors.textSecondary),
-                ),
+                Text(post.vendorName,
+                    style: AppTextStyles.caption
+                        .copyWith(color: AppColors.textSecondary)),
                 const SizedBox(height: 2),
-                Text(
-                  post.title,
-                  style: AppTextStyles.body
-                      .copyWith(color: AppColors.textPrimary),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-                // Quantity controls
-                Row(
-                  children: [
-                    _QtyButton(
-                      icon: Icons.remove,
-                      onTap: onDecrement,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      '$quantity',
-                      style: AppTextStyles.body
-                          .copyWith(color: AppColors.textPrimary),
-                    ),
-                    const SizedBox(width: 12),
-                    _QtyButton(
-                      icon: Icons.add,
-                      onTap: onIncrement,
-                    ),
-                    const Spacer(),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          '\$${post.price.toStringAsFixed(post.price % 1 == 0 ? 0 : 2)}',
-                          style: AppTextStyles.h3
-                              .copyWith(color: AppColors.accentGold),
-                        ),
-                        if (post.originalPrice != null &&
-                            post.originalPrice! > post.price)
-                          Text(
-                            '\$${post.originalPrice!.toStringAsFixed(post.originalPrice! % 1 == 0 ? 0 : 2)}',
-                            style: AppTextStyles.caption.copyWith(
-                              color: AppColors.textSecondary,
-                              decoration: TextDecoration.lineThrough,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
+                Text(post.title,
+                    style: AppTextStyles.body
+                        .copyWith(color: AppColors.textPrimary),
+                    overflow: TextOverflow.ellipsis),
+                if (quantity > 1) ...[
+                  const SizedBox(height: 2),
+                  Text('Cantidad: $quantity',
+                      style: AppTextStyles.caption
+                          .copyWith(color: AppColors.textSecondary)),
+                ],
               ],
             ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '\$${post.price.toStringAsFixed(post.price % 1 == 0 ? 0 : 2)}',
+            style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
           ),
         ],
       ),
@@ -273,58 +294,24 @@ class _ProductCard extends StatelessWidget {
   }
 }
 
-class _QtyButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback? onTap;
+// ── Extras card ────────────────────────────────────────────────────────────
 
-  const _QtyButton({required this.icon, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 28,
-        height: 28,
-        decoration: BoxDecoration(
-          color: onTap != null
-              ? AppColors.bgSurface
-              : AppColors.bgCard,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: AppColors.borderOverlay),
-        ),
-        child: Icon(
-          icon,
-          size: 14,
-          color: onTap != null
-              ? AppColors.textPrimary
-              : AppColors.textSecondary,
-        ),
-      ),
-    );
-  }
-}
-
-// ── Price breakdown ────────────────────────────────────────────────────────
-
-class _PriceBreakdown extends StatelessWidget {
-  final double subtotal;
-  final double discount;
-  final double total;
-  final bool hasOffer;
-
-  const _PriceBreakdown({
-    required this.subtotal,
-    required this.discount,
-    required this.total,
-    required this.hasOffer,
-  });
-
-  String _fmt(double v) =>
-      '\$${v.toStringAsFixed(v % 1 == 0 ? 0 : 2)}';
+class _ExtrasCard extends StatelessWidget {
+  final PostModel post;
+  final Map<String, List<String>> selectedExtras;
+  const _ExtrasCard({required this.post, required this.selectedExtras});
 
   @override
   Widget build(BuildContext context) {
+    final entries = <MapEntry<String, List<String>>>[];
+    for (final extra in post.extras) {
+      final chosen = selectedExtras[extra.id];
+      if (chosen != null && chosen.isNotEmpty) {
+        entries.add(MapEntry(extra.label, chosen));
+      }
+    }
+    if (entries.isEmpty) return const SizedBox.shrink();
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -333,61 +320,76 @@ class _PriceBreakdown extends StatelessWidget {
         border: Border.all(color: AppColors.borderOverlay),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _PriceRow(
-            label: 'Subtotal',
-            value: _fmt(subtotal),
-          ),
-          if (hasOffer && discount > 0) ...[
-            const SizedBox(height: 8),
-            _PriceRow(
-              label: 'Descuento aplicado',
-              value: '-${_fmt(discount)}',
-              valueColor: AppColors.success,
-            ),
-          ],
-          const SizedBox(height: 10),
-          const Divider(color: AppColors.borderOverlay, height: 1),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Text('Total',
-                  style: AppTextStyles.h3
-                      .copyWith(color: AppColors.textPrimary)),
-              const Spacer(),
-              Text(
-                _fmt(total),
-                style: AppTextStyles.h2
-                    .copyWith(color: AppColors.accentGold),
-              ),
-            ],
-          ),
+          Text('PERSONALIZACIONES',
+              style:
+                  AppTextStyles.caption.copyWith(color: AppColors.textSecondary)),
+          const SizedBox(height: 8),
+          ...entries.map((e) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${e.key}: ',
+                        style: AppTextStyles.caption
+                            .copyWith(color: AppColors.textSecondary)),
+                    Expanded(
+                      child: Text(
+                        e.value.join(', '),
+                        style: AppTextStyles.body
+                            .copyWith(color: AppColors.textPrimary),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
         ],
       ),
     );
   }
 }
 
-class _PriceRow extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color? valueColor;
+// ── Price card ─────────────────────────────────────────────────────────────
 
-  const _PriceRow(
-      {required this.label, required this.value, this.valueColor});
+class _PriceCard extends StatelessWidget {
+  final double unitPrice;
+  final int quantity;
+  const _PriceCard({required this.unitPrice, required this.quantity});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Text(label,
-            style: AppTextStyles.body
-                .copyWith(color: AppColors.textSecondary)),
-        const Spacer(),
-        Text(value,
-            style: AppTextStyles.body.copyWith(
-                color: valueColor ?? AppColors.textPrimary)),
-      ],
+    final total = unitPrice * quantity;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderOverlay),
+      ),
+      child: Row(
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Total a pagar',
+                  style: AppTextStyles.h3
+                      .copyWith(color: AppColors.textPrimary)),
+              if (quantity > 1)
+                Text(
+                  '$quantity × \$${unitPrice.toStringAsFixed(unitPrice % 1 == 0 ? 0 : 2)}',
+                  style: AppTextStyles.caption
+                      .copyWith(color: AppColors.textSecondary),
+                ),
+            ],
+          ),
+          const Spacer(),
+          Text(
+            '\$${total.toStringAsFixed(total % 1 == 0 ? 0 : 2)}',
+            style: AppTextStyles.h2.copyWith(color: AppColors.accentGold),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -420,8 +422,8 @@ class _DeliveryCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   draft.deliveryNote,
-                  style: AppTextStyles.body
-                      .copyWith(color: AppColors.textPrimary),
+                  style:
+                      AppTextStyles.body.copyWith(color: AppColors.textPrimary),
                 ),
               ),
               TextButton(
@@ -448,6 +450,37 @@ class _DeliveryCard extends StatelessWidget {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── Info note ──────────────────────────────────────────────────────────────
+
+class _InfoNote extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.accentGold.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.accentGold.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline,
+              size: 16, color: AppColors.accentGold),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'El pago se realiza después de que el vendedor acepte tu solicitud.',
+              style: AppTextStyles.caption
+                  .copyWith(color: AppColors.textSecondary),
+            ),
+          ),
         ],
       ),
     );

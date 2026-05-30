@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../orders/domain/order_model.dart';
+import '../../orders/providers/payment_provider.dart';
 import '../domain/message_model.dart';
 import '../providers/chat_controller.dart';
 import '../providers/chat_provider.dart';
@@ -68,6 +69,22 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
     final orderAsync = ref.watch(orderByIdProvider(widget.orderId));
 
+    // Redirect buyer to review page when vendor marks as delivered
+    ref.listen<AsyncValue<OrderModel?>>(
+      orderByIdProvider(widget.orderId),
+      (prev, next) {
+        final prevOrder = prev?.asData?.value;
+        final newOrder = next.asData?.value;
+        if (newOrder == null || newOrder.buyerId != currentUid) return;
+        if (prevOrder?.status != OrderStatus.delivered &&
+            newOrder.status == OrderStatus.delivered) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted) context.push('/review/${newOrder.id}');
+          });
+        }
+      },
+    );
+
     return orderAsync.when(
       loading: () => _blankScaffold(
         child: const Center(
@@ -99,6 +116,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         final isExpired =
             order.chatExpiresAt.isBefore(DateTime.now());
         final canSend = !isClosed && !isExpired;
+        final awaitingPayment =
+            order.status == OrderStatus.awaiting_payment;
 
         // Scroll when new messages arrive
         ref.listen(chatMessagesProvider(widget.orderId), (_, _) {
@@ -126,9 +145,22 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 ),
               ),
 
+              // ── Buyer: proceed to payment ────────────────────────
+              if (!isVendor && awaitingPayment)
+                _PaymentCTA(order: order),
+
+              // ── Vendor: adjust quantity (awaiting_payment) ───────
+              if (isVendor && awaitingPayment)
+                _QuantityAdjustPanel(order: order),
+
               // ── Vendor: mark delivered ───────────────────────────
               if (isVendor && order.status == OrderStatus.confirmed)
                 _DeliverButton(order: order),
+
+              // ── Auto-refund listener ─────────────────────────────
+              if (order.status == OrderStatus.confirmed &&
+                  order.deliveryDeadlineAt != null)
+                _DeliveryDeadlineWatcher(order: order),
 
               // ── Input or closed notice ───────────────────────────
               if (canSend)
@@ -196,7 +228,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       case OrderStatus.rejected:
         return 'Pedido rechazado por el vendedor.';
       case OrderStatus.cancelled:
-        return 'Pedido cancelado.';
+        return order.isFlagged
+            ? 'Pedido cancelado: tiempo de entrega expirado. Reembolso procesado.'
+            : 'Pedido cancelado.';
       default:
         return 'Chat cerrado.';
     }
@@ -241,6 +275,8 @@ class _StatusStrip extends StatelessWidget {
 
   (String, Color) _badge(OrderStatus s) => switch (s) {
         OrderStatus.pending => ('En espera', AppColors.accentGold),
+        OrderStatus.awaiting_payment =>
+          ('Pago pendiente', AppColors.accentGold),
         OrderStatus.confirmed => ('Confirmado', AppColors.success),
         OrderStatus.delivered => ('Entregado', AppColors.success),
         OrderStatus.rejected => ('Rechazado', AppColors.error),
@@ -476,6 +512,113 @@ class _SystemMessage extends StatelessWidget {
   }
 }
 
+// ── Payment CTA (buyer, awaiting_payment) ──────────────────────────────────
+
+class _PaymentCTA extends ConsumerWidget {
+  final OrderModel order;
+  const _PaymentCTA({required this.order});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      color: AppColors.bgSurface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.accentGold.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                  color: AppColors.accentGold.withValues(alpha: 0.4)),
+            ),
+            child: Text(
+              '¡El vendedor aceptó! Procede al pago para confirmar el pedido.',
+              style:
+                  AppTextStyles.caption.copyWith(color: AppColors.accentGold),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.payment_outlined, size: 18),
+            label: Text(
+                'Proceder al pago — \$${order.finalPrice.toStringAsFixed(order.finalPrice % 1 == 0 ? 0 : 2)}'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accentGold,
+              foregroundColor: AppColors.bgPrimary,
+            ),
+            onPressed: () {
+              ref.read(pendingPaymentOrderIdProvider.notifier).update(order.id);
+              context.push('/payment');
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Delivery deadline watcher ──────────────────────────────────────────────
+
+/// Invisible widget that watches the delivery deadline countdown.
+/// When it expires and the order is still `confirmed`, triggers auto-refund.
+class _DeliveryDeadlineWatcher extends ConsumerWidget {
+  final OrderModel order;
+  const _DeliveryDeadlineWatcher({required this.order});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final deadline = order.deliveryDeadlineAt!;
+    final countdownAsync = ref.watch(countdownProvider(deadline));
+    final remaining = countdownAsync.asData?.value;
+
+    if (remaining == Duration.zero) {
+      // Timer expired and order is still confirmed → auto-refund.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(chatControllerProvider).autoRefundExpired(order);
+      });
+    }
+
+    if (remaining == null || remaining == Duration.zero) {
+      return const SizedBox.shrink();
+    }
+
+    final h = remaining.inHours;
+    final m = remaining.inMinutes.remainder(60);
+    final s = remaining.inSeconds.remainder(60);
+    final label = h > 0
+        ? 'Entrega en ${h}h ${m.toString().padLeft(2, '0')}m'
+        : 'Entrega en ${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+
+    final isUrgent = remaining.inMinutes < 15;
+
+    return Container(
+      width: double.infinity,
+      color: isUrgent
+          ? AppColors.error.withValues(alpha: 0.1)
+          : AppColors.bgSurface,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.local_shipping_outlined,
+              size: 13,
+              color: isUrgent ? AppColors.error : AppColors.textSecondary),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: AppTextStyles.caption.copyWith(
+                color: isUrgent ? AppColors.error : AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── Deliver button ─────────────────────────────────────────────────────────
 
 class _DeliverButton extends ConsumerWidget {
@@ -618,6 +761,142 @@ class _ClosedBar extends StatelessWidget {
         style:
             AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
         textAlign: TextAlign.center,
+      ),
+    );
+  }
+}
+
+// ── Quantity adjust panel (vendor, awaiting_payment) ───────────────────────
+
+class _QuantityAdjustPanel extends ConsumerStatefulWidget {
+  final OrderModel order;
+  const _QuantityAdjustPanel({required this.order});
+
+  @override
+  ConsumerState<_QuantityAdjustPanel> createState() =>
+      _QuantityAdjustPanelState();
+}
+
+class _QuantityAdjustPanelState
+    extends ConsumerState<_QuantityAdjustPanel> {
+  late int _qty;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _qty = widget.order.quantity;
+  }
+
+  @override
+  void didUpdateWidget(_QuantityAdjustPanel old) {
+    super.didUpdateWidget(old);
+    // Sync if the order quantity changed externally (e.g. after update).
+    if (old.order.quantity != widget.order.quantity &&
+        _qty == old.order.quantity) {
+      _qty = widget.order.quantity;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final newTotal = widget.order.originalPrice * _qty;
+    final changed = _qty != widget.order.quantity;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      color: AppColors.bgSurface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('AJUSTAR CANTIDAD',
+              style: AppTextStyles.caption
+                  .copyWith(color: AppColors.textSecondary)),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _QtyBtn(
+                icon: Icons.remove,
+                enabled: _qty > 1,
+                onTap: () => setState(() => _qty--),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Text('$_qty',
+                    style: AppTextStyles.h2
+                        .copyWith(color: AppColors.textPrimary)),
+              ),
+              _QtyBtn(
+                icon: Icons.add,
+                enabled: _qty < 99,
+                onTap: () => setState(() => _qty++),
+              ),
+              const SizedBox(width: 16),
+              Text(
+                'Total: \$${newTotal.toStringAsFixed(newTotal % 1 == 0 ? 0 : 2)}',
+                style: AppTextStyles.body.copyWith(
+                    color: AppColors.accentGold,
+                    fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          if (changed) ...[
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: _loading
+                  ? null
+                  : () async {
+                      setState(() => _loading = true);
+                      await ref
+                          .read(chatControllerProvider)
+                          .updateQuantityAndBill(widget.order, _qty);
+                      if (mounted) setState(() => _loading = false);
+                    },
+              child: _loading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                              AppColors.bgPrimary)),
+                    )
+                  : const Text('Generar nuevo cobro'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _QtyBtn extends StatelessWidget {
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback onTap;
+  const _QtyBtn(
+      {required this.icon, required this.enabled, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final color =
+        enabled ? AppColors.accentGold : AppColors.textSecondary;
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+              color: enabled
+                  ? AppColors.accentGold.withValues(alpha: 0.5)
+                  : AppColors.borderOverlay),
+          color: enabled
+              ? AppColors.accentGold.withValues(alpha: 0.1)
+              : Colors.transparent,
+        ),
+        child: Icon(icon, size: 16, color: color),
       ),
     );
   }

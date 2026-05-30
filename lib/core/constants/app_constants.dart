@@ -30,6 +30,9 @@ class AppConstants {
   // ── Notifications (Firestore-based in-app) ────────────────────────────────
   static const String notificationsCollection = 'notifications';
 
+  // ── Support tickets ────────────────────────────────────────────────────────
+  static const String supportCollection = 'support_tickets';
+
   // ── FCM Web Push (replace with real VAPID key from Firebase Console →
   //    Project Settings → Cloud Messaging → Web Push certificates) ──────────
   static const String fcmVapidKey = 'BIJNDzStcZT9X54n8TUPKYlikLYOZVk-O5pVTnj9gGN_WGmDcvXMVmTR3PRzzr7X7XgNWfcet8SvoHUJVlQ_CbI';

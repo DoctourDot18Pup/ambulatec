@@ -14,10 +14,41 @@ import '../domain/post_model.dart';
 
 // ── Page-scoped delivery providers ────────────────────────────────────────
 
+class _StringNotifier extends Notifier<String> {
+  @override
+  String build() => '';
+  void update(String value) => state = value;
+}
+
+class _ImageBytesNotifier extends Notifier<Uint8List?> {
+  @override
+  Uint8List? build() => null;
+  void update(Uint8List? value) => state = value;
+}
+
+class _ExtrasMapNotifier extends Notifier<Map<String, Set<String>>> {
+  @override
+  Map<String, Set<String>> build() => {};
+  void update(Map<String, Set<String>> value) => state = value;
+}
+
+class _IntNotifier extends Notifier<int> {
+  @override
+  int build() => 1;
+  void update(int value) => state = value;
+}
+
 final _deliveryNoteProvider =
-    StateProvider.autoDispose<String>((ref) => '');
+    NotifierProvider.autoDispose<_StringNotifier, String>(_StringNotifier.new);
 final _deliveryImageBytesProvider =
-    StateProvider.autoDispose<Uint8List?>((ref) => null);
+    NotifierProvider.autoDispose<_ImageBytesNotifier, Uint8List?>(_ImageBytesNotifier.new);
+
+/// Selected options per extra: extraId → Set of selected option strings.
+final _selectedExtrasProvider =
+    NotifierProvider.autoDispose<_ExtrasMapNotifier, Map<String, Set<String>>>(_ExtrasMapNotifier.new);
+
+final _quantityProvider =
+    NotifierProvider.autoDispose<_IntNotifier, int>(_IntNotifier.new);
 
 // ── Offer countdown provider ───────────────────────────────────────────────
 
@@ -128,7 +159,7 @@ class _DetailView extends ConsumerWidget {
       final file = await ImagePicker().pickImage(source: ImageSource.gallery);
       if (file != null) {
         final bytes = await file.readAsBytes();
-        ref.read(_deliveryImageBytesProvider.notifier).state = bytes;
+        ref.read(_deliveryImageBytesProvider.notifier).update(bytes);
       }
     } catch (_) {}
   }
@@ -142,6 +173,8 @@ class _DetailView extends ConsumerWidget {
         ref.watch(followControllerProvider).isLoading;
     final deliveryNote = ref.watch(_deliveryNoteProvider);
     final deliveryImageBytes = ref.watch(_deliveryImageBytesProvider);
+    final selectedExtras = ref.watch(_selectedExtrasProvider);
+    final quantity = ref.watch(_quantityProvider);
     final canOrder = deliveryNote.trim().isNotEmpty;
 
     return Scaffold(
@@ -163,7 +196,10 @@ class _DetailView extends ConsumerWidget {
         children: [
           SingleChildScrollView(
             padding: const EdgeInsets.only(bottom: 100),
-            child: Column(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 720),
+                child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // ── Image gallery ──────────────────────────────────────
@@ -340,6 +376,16 @@ class _DetailView extends ConsumerWidget {
 
                       const SizedBox(height: 24),
 
+                      // ── Quantity stepper ─────────────────────────────
+                      _QuantityStepper(unitPrice: post.price),
+                      const SizedBox(height: 24),
+
+                      // ── Extras selector ──────────────────────────────
+                      if (post.extras.isNotEmpty) ...[
+                        _ExtrasSelector(post: post),
+                        const SizedBox(height: 24),
+                      ],
+
                       // ── Delivery field ───────────────────────────────
                       Text(
                         '¿DÓNDE TE LO ENTREGAMOS?',
@@ -351,8 +397,7 @@ class _DetailView extends ConsumerWidget {
                         style: AppTextStyles.body
                             .copyWith(color: AppColors.textPrimary),
                         onChanged: (v) =>
-                            ref.read(_deliveryNoteProvider.notifier).state =
-                                v,
+                            ref.read(_deliveryNoteProvider.notifier).update(v),
                         decoration: const InputDecoration(
                           hintText: '¿Dónde te lo entregamos?',
                         ),
@@ -396,7 +441,7 @@ class _DetailView extends ConsumerWidget {
                                         .read(
                                             _deliveryImageBytesProvider
                                                 .notifier)
-                                        .state = null,
+                                        .update(null),
                                     child: Container(
                                       padding: const EdgeInsets.all(2),
                                       decoration: const BoxDecoration(
@@ -419,7 +464,9 @@ class _DetailView extends ConsumerWidget {
                 ),
               ],
             ),
-          ),
+                ),
+              ),
+            ),
 
           // ── Fixed CTA button ─────────────────────────────────────────
           Positioned(
@@ -432,16 +479,22 @@ class _DetailView extends ConsumerWidget {
               child: ElevatedButton(
                 onPressed: canOrder
                     ? () {
-                        ref.read(currentOrderProvider.notifier).state =
+                        // Convert Set<String> → List<String> for storage.
+                        final extras = selectedExtras.map(
+                          (k, v) => MapEntry(k, v.toList()),
+                        );
+                        ref.read(currentOrderProvider.notifier).update(
                             OrderDraft(
                           post: post,
                           deliveryNote: deliveryNote,
                           deliveryImageBytes: deliveryImageBytes,
-                        );
+                          selectedExtras: extras,
+                          quantity: quantity,
+                        ));
                         context.go('/order-summary');
                       }
                     : null,
-                child: const Text('Pedir ahora'),
+                child: const Text('Enviar solicitud'),
               ),
             ),
           ),
@@ -475,6 +528,175 @@ class _PriceSection extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+// ── Extras selector ────────────────────────────────────────────────────────
+
+class _ExtrasSelector extends ConsumerWidget {
+  final PostModel post;
+  const _ExtrasSelector({required this.post});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(_selectedExtrasProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: post.extras.map((extra) {
+        final current = selected[extra.id] ?? <String>{};
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                extra.label.toUpperCase(),
+                style: AppTextStyles.caption
+                    .copyWith(color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: extra.options.map((opt) {
+                  final isSelected = current.contains(opt);
+                  return GestureDetector(
+                    onTap: () {
+                      final map = Map<String, Set<String>>.from(
+                          ref.read(_selectedExtrasProvider));
+                      final set = Set<String>.from(map[extra.id] ?? {});
+                      if (extra.isMultiple) {
+                        isSelected ? set.remove(opt) : set.add(opt);
+                      } else {
+                        set.clear();
+                        if (!isSelected) set.add(opt);
+                      }
+                      map[extra.id] = set;
+                      ref.read(_selectedExtrasProvider.notifier).update(map);
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppColors.accentGold.withValues(alpha: 0.18)
+                            : AppColors.bgCard,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isSelected
+                              ? AppColors.accentGold
+                              : AppColors.borderOverlay,
+                        ),
+                      ),
+                      child: Text(
+                        opt,
+                        style: AppTextStyles.body.copyWith(
+                          color: isSelected
+                              ? AppColors.accentGold
+                              : AppColors.textSecondary,
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+// ── Quantity stepper ───────────────────────────────────────────────────────
+
+class _QuantityStepper extends ConsumerWidget {
+  final double unitPrice;
+  const _QuantityStepper({required this.unitPrice});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final qty = ref.watch(_quantityProvider);
+    final total = unitPrice * qty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('CANTIDAD',
+            style: AppTextStyles.caption
+                .copyWith(color: AppColors.textSecondary)),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            _StepButton(
+              icon: Icons.remove,
+              enabled: qty > 1,
+              onTap: () =>
+                  ref.read(_quantityProvider.notifier).update(qty - 1),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: Text(
+                '$qty',
+                style: AppTextStyles.h2
+                    .copyWith(color: AppColors.textPrimary),
+              ),
+            ),
+            _StepButton(
+              icon: Icons.add,
+              enabled: qty < 99,
+              onTap: () =>
+                  ref.read(_quantityProvider.notifier).update(qty + 1),
+            ),
+            const Spacer(),
+            if (qty > 1)
+              Text(
+                'Total: \$${total.toStringAsFixed(total % 1 == 0 ? 0 : 2)}',
+                style: AppTextStyles.body.copyWith(
+                    color: AppColors.accentGold,
+                    fontWeight: FontWeight.w600),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _StepButton extends StatelessWidget {
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback onTap;
+  const _StepButton(
+      {required this.icon, required this.enabled, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final color =
+        enabled ? AppColors.accentGold : AppColors.textSecondary;
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+              color: enabled
+                  ? AppColors.accentGold.withValues(alpha: 0.5)
+                  : AppColors.borderOverlay),
+          color: enabled
+              ? AppColors.accentGold.withValues(alpha: 0.1)
+              : Colors.transparent,
+        ),
+        child: Icon(icon, size: 16, color: color),
+      ),
     );
   }
 }

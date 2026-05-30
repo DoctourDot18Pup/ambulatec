@@ -30,7 +30,7 @@ Crea **4 cuentas de Google distintas** y configura sus documentos en `Firestore 
 
 ---
 
-## Prueba 1 — Onboarding y autenticación
+## Prueba 1 — Onboarding y autenticación ✅
 
 ### 1.1 Primera apertura (dispositivo limpio)
 1. Abre la app → deben aparecer las pantallas de **Onboarding** (slides introductorios).
@@ -51,9 +51,20 @@ Crea **4 cuentas de Google distintas** y configura sus documentos en `Firestore 
 1. Con sesión iniciada, cierra y reabre la app.
 2. Debe ir **directamente a `/home`** sin pedir login.
 
+### 1.4 Inicio de sesión en Web (Chrome)
+> Aplica solo al ejecutar la app en el navegador (`flutter run -d chrome --web-port 8080`).
+
+1. En `/login` debe aparecer el **botón oficial de Google** (renderizado por el SDK de Google Identity Services), no un botón personalizado.
+2. Presiona el botón → aparece el selector de cuentas de Google.
+3. Selecciona la cuenta → el indicador de carga reemplaza al botón **durante toda la carga** (mientras Firebase Auth y Firestore sincronizan).
+4. Una vez completado, redirige a `/home` o `/role-select` sin que el botón de Google vuelva a aparecer.
+5. **Prueba de segundo intento:** cierra sesión y vuelve a iniciar sesión → no debe aparecer el error `Bad state: init() has already been called`.
+
+**Resultado esperado:** flujo web completo sin errores de doble inicialización ni flash del botón de login.
+
 ---
 
-## Prueba 2 — Guards del router
+## Prueba 2 — Guards del router ✅
 
 Verifica que las redirecciones de seguridad funcionen correctamente:
 
@@ -103,7 +114,7 @@ Con `vendor1@...` (aprobado):
 
 ---
 
-## Prueba 5 — Feed y búsqueda (Comprador)
+## Prueba 5 — Feed y búsqueda (Comprador) ✅
 
 Con `buyer@...`:
 
@@ -114,8 +125,8 @@ Con `buyer@...`:
 
 ### 5.2 Perfil público del vendedor
 1. Verifica que se muestre: avatar, nombre, carrera, calificación (estrellas), estado (online/busy).
-2. Presiona **Seguir** → el botón cambia a "Siguiendo".
-3. Presiona de nuevo → deja de seguir.
+2. Presiona **Seguir** → el botón cambia a "Siguiendo". ⚠️ *Pendiente de implementar*
+3. Presiona de nuevo → deja de seguir. ⚠️ *Pendiente de implementar*
 4. La grilla de publicaciones activas del vendedor es visible.
 5. Las reseñas aparecen debajo; presiona "Ver todas" → abre el modal con el listado completo.
 
@@ -131,7 +142,7 @@ Con `buyer@...`:
 
 ---
 
-## Prueba 6 — Flujo completo de orden
+## Prueba 6 — Flujo completo de orden ✅
 
 ### Paso 1 — Comprador realiza el pedido
 1. `buyer` abre un post → presiona **"Pedir"**.
@@ -169,7 +180,7 @@ Con `buyer@...`:
 
 ---
 
-## Prueba 7 — Página de órdenes
+## Prueba 7 — Página de órdenes ✅
 
 ### Vista comprador (`buyer`)
 | Pestaña | Órdenes esperadas |
@@ -206,14 +217,30 @@ Con `vendor1` (con al menos una orden entregada):
 
 ---
 
-## Prueba 9 — Perfil de usuario
+## Prueba 9 — Perfil de usuario ✅
 
 Con cualquier cuenta:
 1. Navega a `/profile`.
-2. Edita el **nombre** → guarda → recarga la página → el cambio persiste.
-3. Edita la **biografía** → guarda → persiste.
-4. Cambia la **foto de perfil** → se sube y el avatar se actualiza en toda la app.
-5. Presiona **"Cerrar sesión"** → redirige a `/login`.
+2. Presiona **"Cerrar sesión"** → redirige a `/login`.
+
+### 9.1 Editar nombre ✅
+1. Desde `/profile`, presiona **"Editar perfil"** → aparece el bottom sheet de edición.
+2. Modifica el campo **Nombre completo**.
+3. Presiona **"Guardar"** → el indicador de carga aparece mientras se guarda.
+4. El sheet se cierra automáticamente al completarse.
+5. El nuevo nombre se refleja **inmediatamente** en el header del perfil y en cualquier otra pantalla donde aparezca (chat, reseñas, detalle de orden).
+6. Recarga la app → el nombre persiste (está en Firestore).
+
+**Resultado esperado:** la actualización propaga a toda la app sin recargar manualmente.
+
+### 9.2 Cambiar foto de perfil ✅
+1. Abre el bottom sheet de **"Editar perfil"**.
+2. Toca el **avatar** → se abre el selector de imágenes del dispositivo/navegador.
+3. Selecciona una imagen → la previsualización se actualiza en el círculo del sheet.
+4. Presiona **"Guardar"** → la imagen se sube a Cloudinary y la URL se guarda en Firestore.
+5. El avatar se actualiza en el header del perfil y en el chip de usuario en el chat.
+
+**Resultado esperado:** la foto de perfil cambia correctamente y se muestra en toda la app.
 
 ---
 
@@ -236,10 +263,100 @@ Verifica que una cuenta sin `isAdmin: true` no pueda acceder a esta ruta (ver Pr
 2. `vendor1` debe recibir una **notificación push** del sistema operativo.
 3. Tap en la notificación → abre la app directamente en `/order-alert/:orderId`.
 
-### Web
+### Web ✅
 1. Abre la app en Chrome → acepta el permiso de notificaciones cuando se solicite.
 2. Verifica en **DevTools → Application → Service Workers** que `firebase-messaging-sw.js` esté activo.
 3. Con la pestaña en segundo plano, realiza una orden → debe aparecer una notificación de sistema.
+
+---
+
+## Prueba 12 — Preferencias de notificaciones ✅
+
+Con cualquier cuenta autenticada:
+
+### 12.1 Acceso a la página ✅
+1. Navega a `/profile` → presiona **"Notificaciones"** → redirige a `/notifications`.
+2. La página tiene dos secciones visibles: **PREFERENCIAS** e **HISTORIAL**.
+
+### 12.2 Toggle de notificaciones
+1. El switch **"Notificaciones en la app"** aparece activado por defecto.
+2. Desactívalo → el subtítulo cambia a *"Los avisos de pedidos no se mostrarán."*
+3. Cierra la app completamente y vuelve a abrirla → el switch sigue **desactivado**.
+4. Con el toggle desactivado, pide una orden desde otra cuenta → el **banner in-app no debe aparecer** en la app del vendedor/comprador.
+5. Reactiva el toggle → los banners vuelven a aparecer normalmente.
+
+**Resultado esperado:** la preferencia persiste en `SharedPreferences` y suprime los banners de forma inmediata.
+
+### 12.3 Historial de notificaciones 
+1. Verifica que la lista muestre notificaciones **leídas y no leídas** (sin filtro de estado).
+2. Las no leídas aparecen con el **texto en negrita** y un **punto dorado** a la derecha.
+3. Las leídas aparecen con texto normal y sin punto.
+4. El tiempo relativo es correcto: "hace X min", "hace X h", "ayer", "hace X días".
+5. Tap en una notificación de tipo `new_order` → navega a `/chat/:orderId` y la marca como leída.
+6. Tap en una notificación de tipo `order_delivered` → navega a `/review/:orderId` y la marca como leída.
+7. El punto dorado desaparece de la notificación tocada.
+
+### 12.4 Marcar todas como leídas
+1. Cuando hay al menos una notificación sin leer → el botón **"Marcar todo"** aparece en el AppBar.
+2. Presiona **"Marcar todo"** → todos los puntos dorados desaparecen.
+3. El botón **"Marcar todo"** desaparece del AppBar.
+4. Verifica en `Firestore → notifications` que los documentos tengan `status: 'read'`.
+
+### 12.5 Sin historial
+1. Con una cuenta nueva (sin órdenes) → la sección HISTORIAL muestra el ícono vacío y el texto *"Sin notificaciones aún"*.
+
+---
+
+## Prueba 13 — Ayuda y soporte ✅
+
+Con cualquier cuenta autenticada:
+
+### 13.1 Apertura del sheet ✅
+1. Navega a `/profile` → presiona **"Ayuda y soporte"** → aparece un bottom sheet.
+2. El sheet muestra el título "Ayuda y soporte" con el subtítulo *"¿En qué podemos ayudarte?"*.
+3. Se listan **5 categorías** con icono y chevron:
+   - Reportar un problema
+   - Problemas con mi cuenta
+   - Reportar a un usuario
+   - Sugerencia de mejora
+   - Otro
+
+### 13.2 Flujo con sub-opciones (Reportar un problema) ✅
+1. Presiona **"Reportar un problema"** → el sheet anima a la vista de opciones.
+2. El título cambia a *"Reportar un problema"* con flecha de retroceso.
+3. Se muestran 6 sub-opciones:
+   - No puedo cerrar sesión
+   - No puedo enviar mensajes
+   - No puedo realizar un pedido
+   - Mi pago no se procesó
+   - La app no carga o se cierra
+   - Otro problema técnico
+4. Presiona la flecha de retroceso → regresa a la pantalla de categorías.
+5. Selecciona una sub-opción (ej. *"No puedo enviar mensajes"*) → anima a la vista de detalles.
+
+### 13.3 Vista de detalles y envío ✅
+1. La vista muestra:
+   - Chip dorado con la categoría seleccionada.
+   - Chip secundario con la sub-opción seleccionada.
+   - Campo de texto opcional con contador hasta 500 caracteres.
+   - Botón **"Enviar reporte"**.
+2. Presiona la flecha → regresa a la selección de sub-opción.
+3. Escribe texto en el campo (opcional) → presiona **"Enviar reporte"**.
+4. Aparece el indicador de carga en el botón mientras se guarda.
+
+### 13.4 Pantalla de éxito ✅
+1. Tras el envío exitoso → aparece la pantalla de éxito con:
+   - Círculo verde con ícono de paloma.
+   - Texto *"¡Mensaje enviado!"*
+   - Subtítulo *"Recibimos tu reporte. Un administrador lo revisará pronto."*
+   - Botón **"Cerrar"**.
+2. Presiona **"Cerrar"** → el sheet se cierra.
+3. Verifica en `Firestore → support_tickets` que se creó el documento con los campos: `userId`, `userEmail`, `userName`, `topic`, `option`, `details`, `status: 'open'`, `createdAt`.
+
+### 13.5 Flujo sin sub-opciones (Sugerencia de mejora) 
+1. Selecciona **"Sugerencia de mejora"** → el sheet salta directamente a la vista de detalles (sin pantalla de sub-opciones).
+2. Solo aparece el chip dorado con la categoría (sin chip de sub-opción).
+3. Completa el envío → pantalla de éxito funciona igual.
 
 ---
 
@@ -264,6 +381,8 @@ Verifica que una cuenta sin `isAdmin: true` no pueda acceder a esta ruta (ver Pr
 | `/review/:id` | Comprador |
 | `/vendor/:id` | Comprador |
 | `/profile` | Todos |
+| `/my-reviews` | Vendedor |
+| `/notifications` | Todos |
 | `/dashboard` | Vendedor |
 | `/earnings` | Vendedor |
 | `/create-post` | Vendedor |
@@ -276,12 +395,22 @@ Verifica que una cuenta sin `isAdmin: true` no pueda acceder a esta ruta (ver Pr
 Antes de cada release, verifica que estos puntos críticos sigan funcionando:
 
 - [ ] Login con Google y redirección por rol
+- [ ] Login con Google en Web sin error `Bad state: init()` en segundo intento
+- [ ] El botón de login no reaparece brevemente tras autenticarse (spinner continuo hasta redirigir)
 - [ ] Guard de vendedor pendiente (`/vendor-verify`)
 - [ ] Guard de admin (`/admin` solo para `isAdmin: true`)
 - [ ] Creación de publicación con imagen
 - [ ] Flujo completo de orden: pedir → pagar → confirmar → entregar → reseñar
 - [ ] Chat visible solo mientras la orden está activa
 - [ ] Banner de notificación in-app al recibir una orden
+- [ ] El banner **no aparece** cuando el toggle de notificaciones está desactivado
 - [ ] Stats del dashboard reflejan datos reales de Firestore
 - [ ] Búsqueda devuelve resultados para posts y vendedores
 - [ ] Cierre de sesión y limpieza de estado
+- [ ] Editar nombre desde perfil → persiste en Firestore y se actualiza en toda la app
+- [ ] Cambiar foto de perfil → sube a Cloudinary y se muestra el avatar actualizado
+- [ ] Toggle de notificaciones persiste entre sesiones (SharedPreferences)
+- [ ] Historial de notificaciones muestra leídas y no leídas; tap marca como leída
+- [ ] "Marcar todo" elimina todos los puntos de no leído
+- [ ] Formulario de soporte envía ticket a Firestore (`support_tickets`) con `status: 'open'`
+- [ ] Flujo de soporte sin sub-opciones (Sugerencia / Otro) salta directamente a detalles

@@ -157,7 +157,7 @@ class _CategoryChips extends ConsumerWidget {
             label: Text(_label(cat)),
             selected: isSelected,
             onSelected: (_) {
-              ref.read(categoryFilterProvider.notifier).state = cat;
+              ref.read(categoryFilterProvider.notifier).update(cat);
             },
             labelStyle: AppTextStyles.caption.copyWith(
               color: isSelected
@@ -212,11 +212,11 @@ class _DesktopGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return GridView.builder(
       padding: const EdgeInsets.all(24),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 320,
         mainAxisSpacing: 16,
         crossAxisSpacing: 16,
-        childAspectRatio: 0.75,
+        childAspectRatio: 0.88,
       ),
       itemCount: posts.length,
       itemBuilder: (context, index) {

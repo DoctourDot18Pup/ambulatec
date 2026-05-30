@@ -12,10 +12,30 @@ import '../../profile/providers/review_controller.dart';
 
 // ── Page-scoped providers ──────────────────────────────────────────────────
 
-final _ratingProvider = StateProvider.autoDispose<int>((ref) => 0);
+class _IntNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+  void update(int value) => state = value;
+}
+
+class _TagsNotifier extends Notifier<Set<String>> {
+  @override
+  Set<String> build() => {};
+  void update(Set<String> value) => state = value;
+}
+
+class _StringNotifier extends Notifier<String> {
+  @override
+  String build() => '';
+  void update(String value) => state = value;
+}
+
+final _ratingProvider =
+    NotifierProvider.autoDispose<_IntNotifier, int>(_IntNotifier.new);
 final _selectedTagsProvider =
-    StateProvider.autoDispose<Set<String>>((ref) => {});
-final _commentProvider = StateProvider.autoDispose<String>((ref) => '');
+    NotifierProvider.autoDispose<_TagsNotifier, Set<String>>(_TagsNotifier.new);
+final _commentProvider =
+    NotifierProvider.autoDispose<_StringNotifier, String>(_StringNotifier.new);
 
 const _kTags = [
   'Puntual',
@@ -89,11 +109,12 @@ class _ReviewContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final reviewState = ref.watch(reviewControllerProvider);
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
+    return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
-        child: Column(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Title ─────────────────────────────────────────────
@@ -139,7 +160,7 @@ class _ReviewContent extends ConsumerWidget {
               style: AppTextStyles.body
                   .copyWith(color: AppColors.textPrimary),
               onChanged: (v) =>
-                  ref.read(_commentProvider.notifier).state = v,
+                  ref.read(_commentProvider.notifier).update(v),
               decoration: const InputDecoration(
                 hintText: 'Cuéntanos tu experiencia…',
                 counterStyle:
@@ -162,6 +183,7 @@ class _ReviewContent extends ConsumerWidget {
             // ── Submit ────────────────────────────────────────────
             _SubmitButton(order: order),
           ],
+        ),
         ),
       ),
     );
@@ -246,7 +268,7 @@ class _StarSelector extends ConsumerWidget {
         final filled = i < rating;
         return GestureDetector(
           onTap: () =>
-              ref.read(_ratingProvider.notifier).state = i + 1,
+              ref.read(_ratingProvider.notifier).update(i + 1),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6),
             child: AnimatedScale(
@@ -284,7 +306,7 @@ class _TagChips extends ConsumerWidget {
           onTap: () {
             final next = Set<String>.from(selected);
             isSelected ? next.remove(tag) : next.add(tag);
-            ref.read(_selectedTagsProvider.notifier).state = next;
+            ref.read(_selectedTagsProvider.notifier).update(next);
           },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
@@ -382,6 +404,7 @@ class _SubmitButton extends ConsumerWidget {
       buyerId: user.uid,
       buyerName: user.displayName ?? '',
       buyerPhotoUrl: user.photoURL ?? '',
+      postTitle: order.postTitle,
       rating: rating,
       tags: tags.toList(),
       comment: comment.trim().isEmpty ? null : comment.trim(),
