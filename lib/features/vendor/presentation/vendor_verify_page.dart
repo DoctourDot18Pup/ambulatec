@@ -10,17 +10,44 @@ import '../../auth/domain/vendor_verification_data.dart';
 
 // ── Form state providers (autoDispose = scoped to this page) ──────────────
 
-final _fullNameProvider = StateProvider.autoDispose<String>((ref) => '');
-final _careerProvider = StateProvider.autoDispose<String>((ref) => '');
+class _StringNotifier extends Notifier<String> {
+  @override
+  String build() => '';
+  void update(String value) => state = value;
+}
+
+class _XFileNotifier extends Notifier<XFile?> {
+  @override
+  XFile? build() => null;
+  void update(XFile? value) => state = value;
+}
+
+class _BoolNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+  void update(bool value) => state = value;
+}
+
+class _DateTimeNotifier extends Notifier<DateTime?> {
+  @override
+  DateTime? build() => null;
+  void update(DateTime? value) => state = value;
+}
+
+final _fullNameProvider =
+    NotifierProvider.autoDispose<_StringNotifier, String>(_StringNotifier.new);
+final _careerProvider =
+    NotifierProvider.autoDispose<_StringNotifier, String>(_StringNotifier.new);
 final _controlNumberProvider =
-    StateProvider.autoDispose<String>((ref) => '');
+    NotifierProvider.autoDispose<_StringNotifier, String>(_StringNotifier.new);
 final _frontImageProvider =
-    StateProvider.autoDispose<XFile?>((ref) => null);
+    NotifierProvider.autoDispose<_XFileNotifier, XFile?>(_XFileNotifier.new);
 final _backImageProvider =
-    StateProvider.autoDispose<XFile?>((ref) => null);
-final _submittedProvider = StateProvider.autoDispose<bool>((ref) => false);
+    NotifierProvider.autoDispose<_XFileNotifier, XFile?>(_XFileNotifier.new);
+final _submittedProvider =
+    NotifierProvider.autoDispose<_BoolNotifier, bool>(_BoolNotifier.new);
 final _submittedAtProvider =
-    StateProvider.autoDispose<DateTime?>((ref) => null);
+    NotifierProvider.autoDispose<_DateTimeNotifier, DateTime?>(_DateTimeNotifier.new);
 
 final _formValidProvider = Provider.autoDispose<bool>((ref) {
   final fullName = ref.watch(_fullNameProvider);
@@ -66,14 +93,13 @@ class _FormView extends ConsumerWidget {
 
   Future<void> _pickImage(
     BuildContext context,
-    WidgetRef ref,
-    AutoDisposeStateProvider<XFile?> provider,
+    void Function(XFile) onPicked,
   ) async {
     try {
       final picker = ImagePicker();
       final file = await picker.pickImage(source: ImageSource.gallery);
       if (file != null) {
-        ref.read(provider.notifier).state = file;
+        onPicked(file);
       }
     } catch (e) {
       if (context.mounted) {
@@ -122,8 +148,8 @@ class _FormView extends ConsumerWidget {
         );
       },
       data: (_) {
-        ref.read(_submittedAtProvider.notifier).state = DateTime.now();
-        ref.read(_submittedProvider.notifier).state = true;
+        ref.read(_submittedAtProvider.notifier).update(DateTime.now());
+        ref.read(_submittedProvider.notifier).update(true);
       },
     );
   }
@@ -181,7 +207,7 @@ class _FormView extends ConsumerWidget {
                     style: AppTextStyles.body
                         .copyWith(color: AppColors.textPrimary),
                     onChanged: (v) =>
-                        ref.read(_fullNameProvider.notifier).state = v,
+                        ref.read(_fullNameProvider.notifier).update(v),
                     textCapitalization: TextCapitalization.words,
                     decoration: const InputDecoration(hintText: ''),
                   ),
@@ -194,7 +220,7 @@ class _FormView extends ConsumerWidget {
                     style: AppTextStyles.body
                         .copyWith(color: AppColors.textPrimary),
                     onChanged: (v) =>
-                        ref.read(_careerProvider.notifier).state = v,
+                        ref.read(_careerProvider.notifier).update(v),
                     textCapitalization: TextCapitalization.sentences,
                     decoration: const InputDecoration(hintText: ''),
                   ),
@@ -207,7 +233,7 @@ class _FormView extends ConsumerWidget {
                     style: AppTextStyles.body
                         .copyWith(color: AppColors.textPrimary),
                     onChanged: (v) =>
-                        ref.read(_controlNumberProvider.notifier).state = v,
+                        ref.read(_controlNumberProvider.notifier).update(v),
                     keyboardType: TextInputType.number,
                     maxLength: 8,
                     inputFormatters: [
@@ -228,7 +254,7 @@ class _FormView extends ConsumerWidget {
                           label: 'Frente de credencial',
                           file: frontImage,
                           onTap: () => _pickImage(
-                              context, ref, _frontImageProvider),
+                              context, (f) => ref.read(_frontImageProvider.notifier).update(f)),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -237,7 +263,7 @@ class _FormView extends ConsumerWidget {
                           label: 'Reverso de credencial',
                           file: backImage,
                           onTap: () => _pickImage(
-                              context, ref, _backImageProvider),
+                              context, (f) => ref.read(_backImageProvider.notifier).update(f)),
                         ),
                       ),
                     ],

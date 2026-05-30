@@ -75,9 +75,12 @@ class _NotificationWrapperState
   Widget build(BuildContext context) {
     // ref.listen re-registers on each build but Riverpod deduplicates it
     // for the same provider.
+    final notificationsEnabled = ref.watch(notificationPreferencesProvider);
+
     ref.listen<AsyncValue<List<AppNotification>>>(
       pendingNotificationsProvider,
       (_, next) {
+        if (!notificationsEnabled) return;
         final notifications = next.asData?.value ?? [];
         for (final n in notifications) {
           if (_shownIds.contains(n.id)) continue;

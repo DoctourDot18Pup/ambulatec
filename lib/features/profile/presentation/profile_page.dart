@@ -1,7 +1,10 @@
+import 'dart:typed_data';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/widgets/adaptive_scaffold.dart';
@@ -12,6 +15,7 @@ import '../../orders/domain/order_model.dart';
 import '../../orders/providers/orders_provider.dart';
 import '../../vendor/providers/vendor_posts_provider.dart';
 import '../domain/review_model.dart';
+import '../providers/profile_controller.dart';
 import '../providers/profile_provider.dart';
 import '../providers/vendor_reviews_provider.dart';
 
@@ -394,7 +398,16 @@ class _OptionsList extends ConsumerWidget {
           _OptionTile(
             icon: Icons.edit_outlined,
             label: 'Editar perfil',
-            onTap: soon,
+            onTap: () => showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: AppColors.bgCard,
+              shape: const RoundedRectangleBorder(
+                borderRadius:
+                    BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              builder: (_) => _EditProfileSheet(user: user),
+            ),
           ),
           _divider(),
           _OptionTile(
@@ -406,7 +419,7 @@ class _OptionsList extends ConsumerWidget {
           _OptionTile(
             icon: Icons.notifications_outlined,
             label: 'Notificaciones',
-            onTap: soon,
+            onTap: () => context.push('/notifications'),
           ),
           _divider(),
           _OptionTile(
@@ -536,6 +549,193 @@ class _VendorReviewsList extends ConsumerWidget {
           ],
         );
       },
+    );
+  }
+}
+
+// ── Edit profile sheet ─────────────────────────────────────────────────────
+
+class _EditProfileSheet extends ConsumerStatefulWidget {
+  final UserModel user;
+  const _EditProfileSheet({required this.user});
+
+  @override
+  ConsumerState<_EditProfileSheet> createState() => _EditProfileSheetState();
+}
+
+class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
+  late final TextEditingController _nameCtrl;
+  Uint8List? _pickedBytes;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl = TextEditingController(text: widget.user.displayName);
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final file = await ImagePicker()
+        .pickImage(source: ImageSource.gallery, imageQuality: 85);
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    setState(() => _pickedBytes = bytes);
+  }
+
+  Future<void> _save() async {
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) return;
+
+    await ref.read(profileControllerProvider.notifier).updateProfile(
+          uid: widget.user.uid,
+          displayName: name,
+          imageBytes: _pickedBytes,
+        );
+
+    if (!mounted) return;
+    if (ref.read(profileControllerProvider) is AsyncData) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<AsyncValue<void>>(profileControllerProvider, (_, state) {
+      state.whenOrNull(
+        error: (e, _) => ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        ),
+      );
+    });
+
+    final isLoading = ref.watch(profileControllerProvider).isLoading;
+
+    final initials = widget.user.displayName.isNotEmpty
+        ? widget.user.displayName
+            .split(' ')
+            .where((s) => s.isNotEmpty)
+            .take(2)
+            .map((s) => s[0].toUpperCase())
+            .join()
+        : '?';
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 32,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.only(bottom: 20),
+            decoration: BoxDecoration(
+              color: AppColors.borderOverlay,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+
+          Text('Editar perfil',
+              style:
+                  AppTextStyles.h3.copyWith(color: AppColors.textPrimary)),
+          const SizedBox(height: 28),
+
+          // ── Avatar picker ──────────────────────────────────────────
+          GestureDetector(
+            onTap: isLoading ? null : _pickImage,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                CircleAvatar(
+                  radius: 44,
+                  backgroundColor: AppColors.accentGreen,
+                  backgroundImage: _pickedBytes != null
+                      ? MemoryImage(_pickedBytes!)
+                      : (widget.user.photoUrl?.isNotEmpty == true
+                          ? CachedNetworkImageProvider(widget.user.photoUrl!)
+                          : null),
+                  child: (_pickedBytes == null &&
+                          (widget.user.photoUrl == null ||
+                              widget.user.photoUrl!.isEmpty))
+                      ? Text(initials,
+                          style: AppTextStyles.h2
+                              .copyWith(color: Colors.white))
+                      : null,
+                ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: const BoxDecoration(
+                      color: AppColors.accentGold,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.camera_alt_outlined,
+                        size: 14, color: Colors.black),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 28),
+
+          // ── Name field ─────────────────────────────────────────────
+          TextFormField(
+            controller: _nameCtrl,
+            enabled: !isLoading,
+            style:
+                AppTextStyles.body.copyWith(color: AppColors.textPrimary),
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(labelText: 'Nombre completo'),
+          ),
+          const SizedBox(height: 32),
+
+          // ── Actions ────────────────────────────────────────────────
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed:
+                      isLoading ? null : () => Navigator.of(context).pop(),
+                  child: const Text('Cancelar'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: isLoading ? null : _save,
+                  child: isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                AppColors.bgPrimary),
+                          ),
+                        )
+                      : const Text('Guardar'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

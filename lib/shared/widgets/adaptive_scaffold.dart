@@ -270,7 +270,7 @@ class _Sidebar extends ConsumerWidget {
                 label: _categoryLabel(cat),
                 selected: isSelected,
                 onTap: () =>
-                    ref.read(categoryFilterProvider.notifier).state = cat,
+                    ref.read(categoryFilterProvider.notifier).update(cat),
               );
             }),
           ],

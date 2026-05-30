@@ -157,7 +157,7 @@ class _CategoryChips extends ConsumerWidget {
             label: Text(_label(cat)),
             selected: isSelected,
             onSelected: (_) {
-              ref.read(categoryFilterProvider.notifier).state = cat;
+              ref.read(categoryFilterProvider.notifier).update(cat);
             },
             labelStyle: AppTextStyles.caption.copyWith(
               color: isSelected

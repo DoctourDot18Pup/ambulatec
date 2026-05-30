@@ -551,7 +551,7 @@ class _PaymentCTA extends ConsumerWidget {
               foregroundColor: AppColors.bgPrimary,
             ),
             onPressed: () {
-              ref.read(pendingPaymentOrderIdProvider.notifier).state = order.id;
+              ref.read(pendingPaymentOrderIdProvider.notifier).update(order.id);
               context.push('/payment');
             },
           ),
