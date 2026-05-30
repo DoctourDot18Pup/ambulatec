@@ -30,7 +30,7 @@ Crea **4 cuentas de Google distintas** y configura sus documentos en `Firestore 
 
 ---
 
-## Prueba 1 — Onboarding y autenticación
+## Prueba 1 — Onboarding y autenticación ✅
 
 ### 1.1 Primera apertura (dispositivo limpio)
 1. Abre la app → deben aparecer las pantallas de **Onboarding** (slides introductorios).
@@ -64,7 +64,7 @@ Crea **4 cuentas de Google distintas** y configura sus documentos en `Firestore 
 
 ---
 
-## Prueba 2 — Guards del router
+## Prueba 2 — Guards del router ✅
 
 Verifica que las redirecciones de seguridad funcionen correctamente:
 
@@ -114,7 +114,7 @@ Con `vendor1@...` (aprobado):
 
 ---
 
-## Prueba 5 — Feed y búsqueda (Comprador)
+## Prueba 5 — Feed y búsqueda (Comprador) ✅
 
 Con `buyer@...`:
 
@@ -142,7 +142,7 @@ Con `buyer@...`:
 
 ---
 
-## Prueba 6 — Flujo completo de orden
+## Prueba 6 — Flujo completo de orden ✅
 
 ### Paso 1 — Comprador realiza el pedido
 1. `buyer` abre un post → presiona **"Pedir"**.
@@ -180,7 +180,7 @@ Con `buyer@...`:
 
 ---
 
-## Prueba 7 — Página de órdenes
+## Prueba 7 — Página de órdenes ✅
 
 ### Vista comprador (`buyer`)
 | Pestaña | Órdenes esperadas |
@@ -217,7 +217,7 @@ Con `vendor1` (con al menos una orden entregada):
 
 ---
 
-## Prueba 9 — Perfil de usuario
+## Prueba 9 — Perfil de usuario ✅
 
 Con cualquier cuenta:
 1. Navega a `/profile`.
@@ -242,9 +242,6 @@ Con cualquier cuenta:
 
 **Resultado esperado:** la foto de perfil cambia correctamente y se muestra en toda la app.
 
-### 9.3 Biografía ⚠️ *Pendiente de implementar*
-> Esta funcionalidad aún no está disponible. Cuando se implemente, verificar que el campo "Biografía" en el formulario de edición de perfil guarde y persista el texto en Firestore.
-
 ---
 
 ## Prueba 10 — Panel de administración
@@ -266,7 +263,7 @@ Verifica que una cuenta sin `isAdmin: true` no pueda acceder a esta ruta (ver Pr
 2. `vendor1` debe recibir una **notificación push** del sistema operativo.
 3. Tap en la notificación → abre la app directamente en `/order-alert/:orderId`.
 
-### Web
+### Web ✅
 1. Abre la app en Chrome → acepta el permiso de notificaciones cuando se solicite.
 2. Verifica en **DevTools → Application → Service Workers** que `firebase-messaging-sw.js` esté activo.
 3. Con la pestaña en segundo plano, realiza una orden → debe aparecer una notificación de sistema.
@@ -277,7 +274,7 @@ Verifica que una cuenta sin `isAdmin: true` no pueda acceder a esta ruta (ver Pr
 
 Con cualquier cuenta autenticada:
 
-### 12.1 Acceso a la página
+### 12.1 Acceso a la página ✅
 1. Navega a `/profile` → presiona **"Notificaciones"** → redirige a `/notifications`.
 2. La página tiene dos secciones visibles: **PREFERENCIAS** e **HISTORIAL**.
 
@@ -290,7 +287,7 @@ Con cualquier cuenta autenticada:
 
 **Resultado esperado:** la preferencia persiste en `SharedPreferences` y suprime los banners de forma inmediata.
 
-### 12.3 Historial de notificaciones
+### 12.3 Historial de notificaciones 
 1. Verifica que la lista muestre notificaciones **leídas y no leídas** (sin filtro de estado).
 2. Las no leídas aparecen con el **texto en negrita** y un **punto dorado** a la derecha.
 3. Las leídas aparecen con texto normal y sin punto.
@@ -314,7 +311,7 @@ Con cualquier cuenta autenticada:
 
 Con cualquier cuenta autenticada:
 
-### 13.1 Apertura del sheet
+### 13.1 Apertura del sheet ✅
 1. Navega a `/profile` → presiona **"Ayuda y soporte"** → aparece un bottom sheet.
 2. El sheet muestra el título "Ayuda y soporte" con el subtítulo *"¿En qué podemos ayudarte?"*.
 3. Se listan **5 categorías** con icono y chevron:
@@ -324,7 +321,7 @@ Con cualquier cuenta autenticada:
    - Sugerencia de mejora
    - Otro
 
-### 13.2 Flujo con sub-opciones (Reportar un problema)
+### 13.2 Flujo con sub-opciones (Reportar un problema) ✅
 1. Presiona **"Reportar un problema"** → el sheet anima a la vista de opciones.
 2. El título cambia a *"Reportar un problema"* con flecha de retroceso.
 3. Se muestran 6 sub-opciones:
@@ -337,7 +334,7 @@ Con cualquier cuenta autenticada:
 4. Presiona la flecha de retroceso → regresa a la pantalla de categorías.
 5. Selecciona una sub-opción (ej. *"No puedo enviar mensajes"*) → anima a la vista de detalles.
 
-### 13.3 Vista de detalles y envío
+### 13.3 Vista de detalles y envío ✅
 1. La vista muestra:
    - Chip dorado con la categoría seleccionada.
    - Chip secundario con la sub-opción seleccionada.
@@ -347,7 +344,7 @@ Con cualquier cuenta autenticada:
 3. Escribe texto en el campo (opcional) → presiona **"Enviar reporte"**.
 4. Aparece el indicador de carga en el botón mientras se guarda.
 
-### 13.4 Pantalla de éxito
+### 13.4 Pantalla de éxito ✅
 1. Tras el envío exitoso → aparece la pantalla de éxito con:
    - Círculo verde con ícono de paloma.
    - Texto *"¡Mensaje enviado!"*
@@ -356,7 +353,7 @@ Con cualquier cuenta autenticada:
 2. Presiona **"Cerrar"** → el sheet se cierra.
 3. Verifica en `Firestore → support_tickets` que se creó el documento con los campos: `userId`, `userEmail`, `userName`, `topic`, `option`, `details`, `status: 'open'`, `createdAt`.
 
-### 13.5 Flujo sin sub-opciones (Sugerencia de mejora)
+### 13.5 Flujo sin sub-opciones (Sugerencia de mejora) 
 1. Selecciona **"Sugerencia de mejora"** → el sheet salta directamente a la vista de detalles (sin pantalla de sub-opciones).
 2. Solo aparece el chip dorado con la categoría (sin chip de sub-opción).
 3. Completa el envío → pantalla de éxito funciona igual.
