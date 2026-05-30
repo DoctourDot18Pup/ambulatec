@@ -128,9 +128,9 @@ class RouterNotifier extends ChangeNotifier {
 
 // ── Providers ──────────────────────────────────────────────────────────────
 
+
 final routerNotifierProvider =
     ChangeNotifierProvider<RouterNotifier>((ref) => RouterNotifier(ref));
-
 final routerProvider = Provider<GoRouter>((ref) {
   final notifier = ref.read(routerNotifierProvider);
   return GoRouter(

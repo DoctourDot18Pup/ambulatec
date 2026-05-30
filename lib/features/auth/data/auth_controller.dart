@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:image_picker/image_picker.dart';
 import '../domain/user_model.dart';
@@ -22,53 +22,56 @@ class AuthController extends Notifier<AsyncValue<void>> {
   // ── Public API ─────────────────────────────────────────────────────────────
 
   Future<void> signInWithGoogle() async {
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
-      final googleSignIn = GoogleSignIn();
-      final googleUser = await googleSignIn.signIn();
-      if (googleUser == null) return; // User dismissed the dialog.
+  state = const AsyncLoading();
+  state = await AsyncValue.guard(() async {
+    // v7: singleton
+    final googleSignIn = GoogleSignIn.instance;
+    await googleSignIn.initialize();
 
-      final googleAuth = await googleUser.authentication;
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
+    // v7: authenticate() reemplaza signIn()
+    final googleUser = await googleSignIn.authenticate();
+
+    // .authentication es un getter síncrono en v7 (no Future)
+    final googleAuth = googleUser.authentication;
+
+    final credential = GoogleAuthProvider.credential(
+      idToken: googleAuth.idToken,
+    );
+
+    final userCredential =
+        await FirebaseAuth.instance.signInWithCredential(credential);
+    final user = userCredential.user;
+    if (user == null) return;
+
+    final userRef = FirebaseFirestore.instance
+        .collection(AppConstants.usersCollection)
+        .doc(user.uid);
+
+    final snapshot = await userRef.get();
+    if (!snapshot.exists) {
+      await userRef.set(
+        UserModel(
+          uid: user.uid,
+          displayName: user.displayName ?? '',
+          email: user.email ?? '',
+          photoUrl: user.photoURL,
+          roles: [],
+          vendorStatus: null,
+          createdAt: DateTime.now(),
+          onboardingCompleted: true,
+        ).toMap(),
       );
-
-      final userCredential =
-          await FirebaseAuth.instance.signInWithCredential(credential);
-      final user = userCredential.user;
-      if (user == null) return;
-
-      // Create the Firestore document on first sign-in.
-      final userRef = FirebaseFirestore.instance
-          .collection(AppConstants.usersCollection)
-          .doc(user.uid);
-
-      final snapshot = await userRef.get();
-      if (!snapshot.exists) {
-        await userRef.set(
-          UserModel(
-            uid: user.uid,
-            displayName: user.displayName ?? '',
-            email: user.email ?? '',
-            photoUrl: user.photoURL,
-            roles: [],
-            vendorStatus: null,
-            createdAt: DateTime.now(),
-            onboardingCompleted: true,
-          ).toMap(),
-        );
-      }
-    });
-  }
+    }
+  });
+}
 
   Future<void> signOut() async {
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
-      await GoogleSignIn().signOut();
-      await FirebaseAuth.instance.signOut();
-    });
-  }
+  state = const AsyncLoading();
+  state = await AsyncValue.guard(() async {
+    await GoogleSignIn.instance.signOut(); // signOut() sí sigue existiendo
+    await FirebaseAuth.instance.signOut();
+  });
+}
 
   /// Assigns roles to the authenticated user.
   ///
