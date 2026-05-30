@@ -9,7 +9,9 @@
       "Bash(xargs grep -l \"renderButton\")",
       "Bash(Get-ChildItem -Recurse \"C:\\\\Users\\\\reyes\\\\AppData\\\\Local\\\\Pub\\\\Cache\\\\hosted\\\\pub.dev\\\\google_sign_in-7.2.0\" -Filter \"*.dart\")",
       "Bash(Select-String \"renderButton\")",
-      "Bash(Select-Object -First 10)"
+      "Bash(Select-Object -First 10)",
+      "Bash(Get-Content \"c:\\\\Users\\\\reyes\\\\OneDrive\\\\Escritorio\\\\Escuela\\\\9no_semestre\\\\Desarrollos_moviles\\\\APPS\\\\ambulatec\\\\TESTING.md\")",
+      "Bash(Measure-Object -Line)"
     ]
   }
 }
