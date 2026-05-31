@@ -9,6 +9,7 @@ import '../../auth/data/auth_controller.dart';
 import '../../auth/data/user_provider.dart';
 import '../../orders/domain/order_model.dart';
 import '../../orders/providers/orders_provider.dart';
+import '../../orders/providers/pending_notifications_provider.dart';
 import '../providers/vendor_stats_provider.dart';
 
 class DashboardPage extends ConsumerWidget {
@@ -38,6 +39,62 @@ class _DashboardBody extends ConsumerWidget {
             ? const _DesktopDashboard()
             : const _MobileDashboard();
       },
+    );
+  }
+}
+
+// ── Notification bell with unread badge ────────────────────────────────────
+
+class _NotificationBell extends ConsumerWidget {
+  const _NotificationBell();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unreadCount =
+        ref.watch(pendingNotificationsProvider).asData?.value.length ?? 0;
+    final hasUnread = unreadCount > 0;
+
+    return IconButton(
+      onPressed: () => context.push('/notifications'),
+      icon: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Icon(
+            hasUnread
+                ? Icons.notifications
+                : Icons.notifications_outlined,
+            color: hasUnread
+                ? AppColors.accentGold
+                : AppColors.textSecondary,
+          ),
+          if (hasUnread)
+            Positioned(
+              right: -4,
+              top: -4,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                constraints:
+                    const BoxConstraints(minWidth: 16, minHeight: 16),
+                decoration: BoxDecoration(
+                  color: AppColors.error,
+                  borderRadius: BorderRadius.circular(8),
+                  border:
+                      Border.all(color: AppColors.bgSurface, width: 1.5),
+                ),
+                child: Text(
+                  unreadCount > 9 ? '9+' : '$unreadCount',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    height: 1.1,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -79,11 +136,7 @@ class _MobileDashboard extends ConsumerWidget {
                   ]),
                 ),
                 const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.notifications_outlined,
-                      color: AppColors.textSecondary),
-                  onPressed: () {},
-                ),
+                const _NotificationBell(),
                 CircleAvatar(
                   radius: 16,
                   backgroundColor: AppColors.bgCard,
