@@ -50,10 +50,12 @@ class NotificationService {
       );
 
       // Create the high-priority channel (Android 8+)
-      await _plugin
+      final androidImpl = _plugin
           .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(_kChannel);
+              AndroidFlutterLocalNotificationsPlugin>();
+      await androidImpl?.createNotificationChannel(_kChannel);
+      // Request POST_NOTIFICATIONS permission at runtime (Android 13+)
+      await androidImpl?.requestNotificationsPermission();
 
       // ── FCM setup ────────────────────────────────────────────────────
       FirebaseMessaging.onBackgroundMessage(

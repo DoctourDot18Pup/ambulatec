@@ -84,12 +84,17 @@ class _NotificationWrapperState extends ConsumerState<_NotificationWrapper>
     with WidgetsBindingObserver {
   final Set<String> _shownIds = {};
   bool _isBackground = false;
-  bool _initialized = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    // Seed _shownIds from whatever data is already in the provider (cached).
+    // This prevents showing banners for notifications that existed before this
+    // session started.
+    final existing = ref.read(pendingNotificationsProvider).asData?.value ?? [];
+    _shownIds.addAll(existing.map((n) => n.id));
 
     // Forward local notification taps to the pending route provider.
     NotificationService.onNotificationTap = (route) {
@@ -142,15 +147,19 @@ class _NotificationWrapperState extends ConsumerState<_NotificationWrapper>
 
     ref.listen<AsyncValue<List<AppNotification>>>(
       pendingNotificationsProvider,
-      (_, next) {
+      (prev, next) {
         if (!notificationsEnabled) return;
         final notifications = next.asData?.value ?? [];
-        if (!_initialized) {
-          // Seed IDs on first load to avoid flooding banners for old notifications.
-          _initialized = true;
+
+        // When prev had no data (loading → first data, or error → recovery),
+        // the new list contains pre-existing notifications, not new ones.
+        // Seed _shownIds without triggering any banners.
+        if (prev?.asData == null) {
           _shownIds.addAll(notifications.map((n) => n.id));
           return;
         }
+
+        // Normal case: show banners only for IDs that just appeared.
         for (final n in notifications) {
           if (_shownIds.contains(n.id)) continue;
           _shownIds.add(n.id);
