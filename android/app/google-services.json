@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "553891451539-023pu4uthh813vinkp9l5dib5k6p6fol.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.teccelaya.ambulatec",
+            "certificate_hash": "e24b239ed2df49ded51a13e997d56e13e24899e0"
+          }
+        },
+        {
           "client_id": "553891451539-bjq5dv0gbk9181ij7t3p0ais7u5cb8pj.apps.googleusercontent.com",
           "client_type": 3
         }
