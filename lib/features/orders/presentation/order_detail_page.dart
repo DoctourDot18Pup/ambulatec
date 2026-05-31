@@ -372,7 +372,7 @@ class _ActionsSection extends ConsumerWidget {
         );
       }
 
-      if (order.status == OrderStatus.rejected) {
+      if (order.status == OrderStatus.rejected && !order.postReactivated) {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

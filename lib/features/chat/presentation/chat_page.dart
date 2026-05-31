@@ -158,7 +158,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 _DeliverButton(order: order),
 
               // ── Vendor: reactivate post after rejection ──────────
-              if (isVendor && order.status == OrderStatus.rejected)
+              if (isVendor &&
+                  order.status == OrderStatus.rejected &&
+                  !order.postReactivated)
                 _ReactivateButton(order: order),
 
               // ── Auto-refund listener ─────────────────────────────

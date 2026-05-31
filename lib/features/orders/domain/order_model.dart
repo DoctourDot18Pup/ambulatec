@@ -34,6 +34,7 @@ class OrderModel {
   final DateTime? deliveryDeadlineAt;
   final bool isFlagged;
   final DateTime? paymentLockedAt;
+  final bool postReactivated;
 
   const OrderModel({
     required this.id,
@@ -60,6 +61,7 @@ class OrderModel {
     this.deliveryDeadlineAt,
     this.isFlagged = false,
     this.paymentLockedAt,
+    this.postReactivated = false,
   });
 
   // ── Factory ────────────────────────────────────────────────────────────────
@@ -126,6 +128,7 @@ class OrderModel {
       deliveryDeadlineAt: parseDateOptional(map['deliveryDeadlineAt']),
       isFlagged: map['isFlagged'] as bool? ?? false,
       paymentLockedAt: parseDateOptional(map['paymentLockedAt']),
+      postReactivated: map['postReactivated'] as bool? ?? false,
     );
   }
 
@@ -159,6 +162,7 @@ class OrderModel {
         'isFlagged': isFlagged,
         if (paymentLockedAt != null)
           'paymentLockedAt': Timestamp.fromDate(paymentLockedAt!),
+        'postReactivated': postReactivated,
       };
 
   // ── copyWith ───────────────────────────────────────────────────────────────
@@ -188,6 +192,7 @@ class OrderModel {
     DateTime? deliveryDeadlineAt,
     bool? isFlagged,
     DateTime? paymentLockedAt,
+    bool? postReactivated,
   }) {
     return OrderModel(
       id: id ?? this.id,
@@ -214,6 +219,7 @@ class OrderModel {
       deliveryDeadlineAt: deliveryDeadlineAt ?? this.deliveryDeadlineAt,
       isFlagged: isFlagged ?? this.isFlagged,
       paymentLockedAt: paymentLockedAt ?? this.paymentLockedAt,
+      postReactivated: postReactivated ?? this.postReactivated,
     );
   }
 }

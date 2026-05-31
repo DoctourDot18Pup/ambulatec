@@ -215,6 +215,12 @@ class ChatController {
         .doc(order.postId)
         .update({'isActive': true});
 
+    // Mark the order so the "Reactivar" button no longer appears.
+    await FirebaseFirestore.instance
+        .collection(AppConstants.ordersCollection)
+        .doc(order.id)
+        .update({'postReactivated': true});
+
     await _addSystemMessage(
         order.id,
         '✅ El vendedor reactivó la publicación. ¡Ya puedes hacer un nuevo pedido!');
