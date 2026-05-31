@@ -75,11 +75,14 @@ final pendingNotificationsProvider =
       .collection(AppConstants.notificationsCollection)
       .where('recipientId', isEqualTo: user.uid)
       .where('status', isEqualTo: 'unread')
-      .orderBy('createdAt', descending: true)
       .snapshots()
-      .map((snap) => snap.docs
-          .map((d) => AppNotification.fromMap(d.data(), d.id))
-          .toList());
+      .map((snap) {
+        final list = snap.docs
+            .map((d) => AppNotification.fromMap(d.data(), d.id))
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return list;
+      });
 });
 
 // ── Helper ─────────────────────────────────────────────────────────────────

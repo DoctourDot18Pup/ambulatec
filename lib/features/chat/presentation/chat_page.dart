@@ -157,6 +157,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               if (isVendor && order.status == OrderStatus.confirmed)
                 _DeliverButton(order: order),
 
+              // ── Vendor: reactivate post after rejection ──────────
+              if (isVendor && order.status == OrderStatus.rejected)
+                _ReactivateButton(order: order),
+
               // ── Auto-refund listener ─────────────────────────────
               if (order.status == OrderStatus.confirmed &&
                   order.deliveryDeadlineAt != null)
@@ -904,6 +908,89 @@ class _QuantityAdjustPanelState
         ],
       ),
     );
+  }
+}
+
+// ── Reactivate post button (vendor, rejected) ──────────────────────────────
+
+class _ReactivateButton extends ConsumerWidget {
+  final OrderModel order;
+  const _ReactivateButton({required this.order});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      color: AppColors.bgSurface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.accentGold.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                  color: AppColors.accentGold.withValues(alpha: 0.3)),
+            ),
+            child: Text(
+              'El pedido fue rechazado. Puedes reactivar la publicación para que el comprador pueda hacer un nuevo pedido.',
+              style:
+                  AppTextStyles.caption.copyWith(color: AppColors.accentGold),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.refresh_outlined, size: 18),
+            label: const Text('Reactivar publicación'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.accentGold,
+              side: const BorderSide(color: AppColors.accentGold),
+            ),
+            onPressed: () async {
+              final ok = await _confirm(context);
+              if (ok && context.mounted) {
+                await ref
+                    .read(chatControllerProvider)
+                    .reactivatePost(order);
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool> _confirm(BuildContext context) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        title: Text('¿Reactivar publicación?',
+            style: AppTextStyles.h3
+                .copyWith(color: AppColors.textPrimary)),
+        content: Text(
+          'La publicación volverá a aparecer en el catálogo y se notificará al comprador.',
+          style:
+              AppTextStyles.body.copyWith(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accentGold,
+                foregroundColor: AppColors.bgPrimary),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Reactivar'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 }
 

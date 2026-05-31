@@ -13,9 +13,12 @@ final vendorPostsProvider = StreamProvider<List<PostModel>>((ref) {
   return FirebaseFirestore.instance
       .collection(AppConstants.postsCollection)
       .where('vendorId', isEqualTo: user.uid)
-      .orderBy('createdAt', descending: true)
       .snapshots()
-      .map((snap) => snap.docs
-          .map((d) => PostModel.fromMap(d.id, d.data()))
-          .toList());
+      .map((snap) {
+        final list = snap.docs
+            .map((d) => PostModel.fromMap(d.id, d.data()))
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return list;
+      });
 });

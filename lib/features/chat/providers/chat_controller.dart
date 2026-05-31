@@ -203,6 +203,36 @@ class ChatController {
         'procesó el reembolso automático.');
   }
 
+  // ── Post re-activation ────────────────────────────────────────────────────
+
+  /// Re-activates the post that was deactivated when this order was rejected.
+  /// Notifies the buyer so they can place a new order.
+  Future<void> reactivatePost(OrderModel order) async {
+    if (order.postId.isEmpty) return;
+
+    await FirebaseFirestore.instance
+        .collection(AppConstants.postsCollection)
+        .doc(order.postId)
+        .update({'isActive': true});
+
+    await _addSystemMessage(
+        order.id,
+        '✅ El vendedor reactivó la publicación. ¡Ya puedes hacer un nuevo pedido!');
+
+    await FirebaseFirestore.instance
+        .collection(AppConstants.notificationsCollection)
+        .add({
+      'type': 'post_reactivated',
+      'recipientId': order.buyerId,
+      'vendorId': order.vendorId,
+      'orderId': order.id,
+      'buyerName': order.buyerName,
+      'productTitle': order.postTitle,
+      'status': 'unread',
+      'createdAt': Timestamp.fromDate(DateTime.now()),
+    });
+  }
+
   // ── Payment lock ───────────────────────────────────────────────────────────
 
   /// Called when the buyer enters the payment page.

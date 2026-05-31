@@ -17,11 +17,15 @@ final ordersProvider = StreamProvider<List<OrderModel>>((ref) {
   final uid = user.uid;
   final isVendor = user.roles.contains('vendor');
 
-  final query = FirebaseFirestore.instance
+  return FirebaseFirestore.instance
       .collection(AppConstants.ordersCollection)
       .where(isVendor ? 'vendorId' : 'buyerId', isEqualTo: uid)
-      .orderBy('createdAt', descending: true);
-
-  return query.snapshots().map((snap) =>
-      snap.docs.map((d) => OrderModel.fromMap(d.id, d.data())).toList());
+      .snapshots()
+      .map((snap) {
+        final list = snap.docs
+            .map((d) => OrderModel.fromMap(d.id, d.data()))
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return list;
+      });
 });

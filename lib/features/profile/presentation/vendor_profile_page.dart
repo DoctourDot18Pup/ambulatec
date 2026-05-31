@@ -36,11 +36,15 @@ final _vendorActivePostsProvider =
       .collection(AppConstants.postsCollection)
       .where('vendorId', isEqualTo: vendorId)
       .where('isActive', isEqualTo: true)
-      .orderBy('createdAt', descending: true)
       .limit(20)
       .snapshots()
-      .map((snap) =>
-          snap.docs.map((d) => PostModel.fromMap(d.id, d.data())).toList());
+      .map((snap) {
+        final list = snap.docs
+            .map((d) => PostModel.fromMap(d.id, d.data()))
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return list;
+      });
 });
 
 // ── Page ───────────────────────────────────────────────────────────────────

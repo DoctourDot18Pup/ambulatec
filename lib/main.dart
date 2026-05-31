@@ -84,6 +84,7 @@ class _NotificationWrapperState extends ConsumerState<_NotificationWrapper>
     with WidgetsBindingObserver {
   final Set<String> _shownIds = {};
   bool _isBackground = false;
+  bool _initialized = false;
 
   @override
   void initState() {
@@ -144,6 +145,12 @@ class _NotificationWrapperState extends ConsumerState<_NotificationWrapper>
       (_, next) {
         if (!notificationsEnabled) return;
         final notifications = next.asData?.value ?? [];
+        if (!_initialized) {
+          // Seed IDs on first load to avoid flooding banners for old notifications.
+          _initialized = true;
+          _shownIds.addAll(notifications.map((n) => n.id));
+          return;
+        }
         for (final n in notifications) {
           if (_shownIds.contains(n.id)) continue;
           _shownIds.add(n.id);
@@ -160,18 +167,23 @@ class _NotificationWrapperState extends ConsumerState<_NotificationWrapper>
 
     final isDelivered = n.type == 'order_delivered';
     final isNewOrder = n.type == 'new_order';
+    final isReactivated = n.type == 'post_reactivated';
 
     final title = isDelivered
         ? '¡Tu pedido llegó!'
         : isNewOrder
             ? '¡Nuevo pedido!'
-            : '¡Actualización de pedido!';
+            : isReactivated
+                ? '¡Publicación reactivada!'
+                : '¡Actualización de pedido!';
 
     final body = isDelivered
         ? 'Califica tu experiencia con ${n.productTitle}'
         : isNewOrder
             ? '${n.buyerName} quiere: ${n.productTitle}'
-            : n.productTitle;
+            : isReactivated
+                ? '${n.productTitle} ya está disponible'
+                : n.productTitle;
 
     final route = isDelivered
         ? '/review/${n.orderId}'
