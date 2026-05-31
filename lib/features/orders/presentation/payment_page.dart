@@ -1,8 +1,10 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../chat/providers/chat_controller.dart';
@@ -83,12 +85,15 @@ class PaymentPage extends ConsumerWidget {
                         .copyWith(color: AppColors.textSecondary)));
           }
           final total = order.finalPrice;
-          return LayoutBuilder(builder: (context, constraints) {
-            final isDesktop = constraints.maxWidth >= 1024;
-            return isDesktop
-                ? _DesktopLayoutOrder(order: order, total: total)
-                : _MobileLayoutOrder(order: order, total: total);
-          });
+          return _PaymentLockGuard(
+            order: order,
+            child: LayoutBuilder(builder: (context, constraints) {
+              final isDesktop = constraints.maxWidth >= 1024;
+              return isDesktop
+                  ? _DesktopLayoutOrder(order: order, total: total)
+                  : _MobileLayoutOrder(order: order, total: total);
+            }),
+          );
         },
       );
     }
@@ -672,6 +677,43 @@ class _CardNumberFormatter extends TextInputFormatter {
     );
   }
 }
+
+// ── Payment lock guard ─────────────────────────────────────────────────────
+
+/// Sets [paymentLockedAt] when the buyer enters the payment page so the
+/// vendor's quantity-adjust panel is disabled, and removes it on exit.
+class _PaymentLockGuard extends ConsumerStatefulWidget {
+  final OrderModel order;
+  final Widget child;
+  const _PaymentLockGuard({required this.order, required this.child});
+
+  @override
+  ConsumerState<_PaymentLockGuard> createState() => _PaymentLockGuardState();
+}
+
+class _PaymentLockGuardState extends ConsumerState<_PaymentLockGuard> {
+  @override
+  void initState() {
+    super.initState();
+    ref.read(chatControllerProvider).lockPayment(widget.order.id);
+  }
+
+  @override
+  void dispose() {
+    // Direct Firestore call — ref is not safe to use after dispose.
+    FirebaseFirestore.instance
+        .collection(AppConstants.ordersCollection)
+        .doc(widget.order.id)
+        .update({'paymentLockedAt': FieldValue.delete()})
+        .ignore();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
+// ── Input formatters ───────────────────────────────────────────────────────
 
 class _ExpiryFormatter extends TextInputFormatter {
   @override

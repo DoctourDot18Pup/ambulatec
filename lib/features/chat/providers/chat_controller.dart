@@ -196,6 +196,27 @@ class ChatController {
         'procesó el reembolso automático.');
   }
 
+  // ── Payment lock ───────────────────────────────────────────────────────────
+
+  /// Called when the buyer enters the payment page.
+  /// Sets [paymentLockedAt] so the vendor's quantity panel is disabled.
+  Future<void> lockPayment(String orderId) async {
+    await FirebaseFirestore.instance
+        .collection(AppConstants.ordersCollection)
+        .doc(orderId)
+        .update({'paymentLockedAt': FieldValue.serverTimestamp()});
+  }
+
+  /// Called when the buyer leaves the payment page (back, error, or success).
+  /// On success the order moves to `confirmed` so the lock is irrelevant,
+  /// but we delete it anyway to keep Firestore tidy.
+  Future<void> unlockPayment(String orderId) async {
+    await FirebaseFirestore.instance
+        .collection(AppConstants.ordersCollection)
+        .doc(orderId)
+        .update({'paymentLockedAt': FieldValue.delete()});
+  }
+
   // ── Internal helpers ───────────────────────────────────────────────────────
 
   Future<void> _addSystemMessage(String orderId, String text) async {

@@ -33,6 +33,7 @@ class OrderModel {
   final Map<String, List<String>> selectedExtras;
   final DateTime? deliveryDeadlineAt;
   final bool isFlagged;
+  final DateTime? paymentLockedAt;
 
   const OrderModel({
     required this.id,
@@ -58,6 +59,7 @@ class OrderModel {
     this.selectedExtras = const {},
     this.deliveryDeadlineAt,
     this.isFlagged = false,
+    this.paymentLockedAt,
   });
 
   // ── Factory ────────────────────────────────────────────────────────────────
@@ -123,6 +125,7 @@ class OrderModel {
           {},
       deliveryDeadlineAt: parseDateOptional(map['deliveryDeadlineAt']),
       isFlagged: map['isFlagged'] as bool? ?? false,
+      paymentLockedAt: parseDateOptional(map['paymentLockedAt']),
     );
   }
 
@@ -154,6 +157,8 @@ class OrderModel {
         if (deliveryDeadlineAt != null)
           'deliveryDeadlineAt': Timestamp.fromDate(deliveryDeadlineAt!),
         'isFlagged': isFlagged,
+        if (paymentLockedAt != null)
+          'paymentLockedAt': Timestamp.fromDate(paymentLockedAt!),
       };
 
   // ── copyWith ───────────────────────────────────────────────────────────────
@@ -182,6 +187,7 @@ class OrderModel {
     Map<String, List<String>>? selectedExtras,
     DateTime? deliveryDeadlineAt,
     bool? isFlagged,
+    DateTime? paymentLockedAt,
   }) {
     return OrderModel(
       id: id ?? this.id,
@@ -207,6 +213,7 @@ class OrderModel {
       selectedExtras: selectedExtras ?? this.selectedExtras,
       deliveryDeadlineAt: deliveryDeadlineAt ?? this.deliveryDeadlineAt,
       isFlagged: isFlagged ?? this.isFlagged,
+      paymentLockedAt: paymentLockedAt ?? this.paymentLockedAt,
     );
   }
 }

@@ -791,15 +791,42 @@ class _QuantityAdjustPanelState
   @override
   void didUpdateWidget(_QuantityAdjustPanel old) {
     super.didUpdateWidget(old);
-    // Sync if the order quantity changed externally (e.g. after update).
     if (old.order.quantity != widget.order.quantity &&
         _qty == old.order.quantity) {
       _qty = widget.order.quantity;
     }
   }
 
+  /// Returns true if the buyer has the checkout open AND the lock hasn't
+  /// expired (auto-expires after 5 minutes to handle abandoned checkouts).
+  bool get _isLocked {
+    final locked = widget.order.paymentLockedAt;
+    if (locked == null) return false;
+    return DateTime.now().difference(locked).inMinutes < 5;
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLocked) {
+      return Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        color: AppColors.bgSurface,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.lock_outline,
+                size: 15, color: AppColors.textSecondary),
+            const SizedBox(width: 8),
+            Text(
+              'El comprador está procesando el pago',
+              style: AppTextStyles.caption
+                  .copyWith(color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+      );
+    }
+
     final newTotal = widget.order.originalPrice * _qty;
     final changed = _qty != widget.order.quantity;
 
