@@ -297,9 +297,22 @@ Verifica que una cuenta sin `isAdmin: true` no pueda acceder a esta ruta (ver Pr
 ## Prueba 11 — Notificaciones push (Android / Web)
 
 ### Android
-1. `buyer` realiza una orden a `vendor1` con la app de `vendor1` en **segundo plano**.
-2. `vendor1` debe recibir una **notificación push** del sistema operativo.
+1. `buyer` realiza una orden a `vendor1` con la app de `vendor1` **abierta o recién minimizada**.
+2. `vendor1` debe recibir una **notificación local** del sistema operativo.
 3. Tap en la notificación → abre la app directamente en `/order-alert/:orderId`.
+
+> ⚠️ **Limitación conocida (decisión de diseño del demo):**
+> Las notificaciones locales se generan mediante un *listener* de Firestore que
+> corre **dentro de la app**. Android mantiene vivo el proceso solo unos minutos
+> tras minimizar; después lo congela (Doze / restricciones de batería) y el
+> listener deja de recibir eventos, por lo que **no llegan notificaciones con la
+> app cerrada o en segundo plano prolongado**. Esto es una limitación del SO, no
+> un error de código.
+>
+> La solución correcta (push real con la app cerrada) requiere un **emisor FCM
+> del lado servidor** — una Cloud Function (plan Blaze de Firebase). Como este es
+> un proyecto demostrativo sin presupuesto, se optó por **no** habilitarlo. El
+> **historial de notificaciones dentro de la app siempre funciona** (Prueba 12.3).
 
 ### Web ✅
 1. Abre la app en Chrome → acepta el permiso de notificaciones cuando se solicite.
