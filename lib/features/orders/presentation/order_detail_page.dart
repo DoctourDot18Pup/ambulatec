@@ -371,6 +371,57 @@ class _ActionsSection extends ConsumerWidget {
           ],
         );
       }
+
+      if (order.status == OrderStatus.rejected) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: AppColors.accentGold.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                    color: AppColors.accentGold.withValues(alpha: 0.3)),
+              ),
+              child: Text(
+                'Rechazaste este pedido y la publicación se desactivó. '
+                'Puedes reactivarla para que vuelva a aparecer en el catálogo.',
+                style: AppTextStyles.caption
+                    .copyWith(color: AppColors.accentGold),
+              ),
+            ),
+            _ActionButton(
+              label: 'Reactivar publicación',
+              icon: Icons.refresh_outlined,
+              color: AppColors.accentGold,
+              outlined: true,
+              onTap: () async {
+                final ok = await _confirmDialog(
+                  context,
+                  title: '¿Reactivar publicación?',
+                  body:
+                      'La publicación volverá a aparecer en el catálogo y se '
+                      'notificará al comprador.',
+                  confirmLabel: 'Reactivar',
+                  confirmColor: AppColors.accentGold,
+                );
+                if (ok && context.mounted) {
+                  final messenger = ScaffoldMessenger.of(context);
+                  await ref
+                      .read(chatControllerProvider)
+                      .reactivatePost(order);
+                  messenger.showSnackBar(const SnackBar(
+                    content: Text('Publicación reactivada'),
+                    behavior: SnackBarBehavior.floating,
+                  ));
+                }
+              },
+            ),
+          ],
+        );
+      }
     }
 
     // ── Buyer actions ───────────────────────────────────────────────────────
