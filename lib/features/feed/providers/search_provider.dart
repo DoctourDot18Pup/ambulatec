@@ -27,22 +27,23 @@ final searchQueryProvider =
 
 // ── Results provider ───────────────────────────────────────────────────────
 
-/// Searches posts (by title prefix) and vendors (by displayName prefix).
+/// Searches posts and vendors by **case-insensitive substring** match.
 ///
-/// **Debounce:** implemented by awaiting 300 ms before the Firestore calls.
-/// If [searchQueryProvider] changes before 300 ms elapses, Riverpod
-/// re-creates this autoDispose provider and cancels the previous future,
-/// preventing unnecessary Firestore reads.
+/// **Approach:** fetches active posts and approved vendors (capped), then
+/// filters client-side with `toLowerCase().contains(query)`. Unlike Firestore
+/// prefix ranges, this matches anywhere in the string ("birria" finds
+/// "TACOS DE BIRRIA") and is case-insensitive, with no composite index and no
+/// extra stored field — ideal for the demo's catalog size.
 ///
-/// **Limitation:** Firestore prefix search is case-sensitive and only matches
-/// strings that *start with* the query. For full-text search, integrate
-/// Algolia or Typesense (noted in README as a future improvement).
+/// **Debounce:** awaits 300 ms before querying. If [searchQueryProvider]
+/// changes first, Riverpod re-creates this autoDispose provider and cancels
+/// the previous future.
 ///
-/// Requires Firestore index:
-///   posts → title ASC (single-field index, usually created automatically)
+/// **Scale note:** for a large catalog, move to Algolia/Typesense or a
+/// `titleLower` prefix field (documented as a future improvement in README).
 final searchResultsProvider =
     FutureProvider.autoDispose<SearchResults>((ref) async {
-  final query = ref.watch(searchQueryProvider).trim();
+  final query = ref.watch(searchQueryProvider).trim().toLowerCase();
 
   if (query.length < 2) {
     return const SearchResults(posts: [], vendors: []);
@@ -51,41 +52,43 @@ final searchResultsProvider =
   // 300 ms debounce — cancel if query changes before this resolves.
   await Future.delayed(const Duration(milliseconds: 300));
 
-  final endQuery = '$query'; // Unicode sentinel for prefix range
-
-  // Run both queries in parallel.
+  // Fetch candidates in parallel (capped for the demo's catalog size).
   final results = await Future.wait([
-    // Posts: prefix match on title, filter inactive client-side
     FirebaseFirestore.instance
         .collection(AppConstants.postsCollection)
-        .where('title', isGreaterThanOrEqualTo: query)
-        .where('title', isLessThanOrEqualTo: endQuery)
-        .limit(10)
+        .where('isActive', isEqualTo: true)
+        .limit(100)
         .get(),
-
-    // Vendors: prefix match on displayName, filter role client-side
     FirebaseFirestore.instance
         .collection(AppConstants.usersCollection)
-        .where('displayName', isGreaterThanOrEqualTo: query)
-        .where('displayName', isLessThanOrEqualTo: endQuery)
-        .limit(10)
+        .where('vendorStatus', isEqualTo: VendorStatus.approved.name)
+        .limit(100)
         .get(),
   ]);
 
-  final posts = results[0].docs
+  // Posts: match on title, vendor name or category (case-insensitive).
+  final posts = results[0]
+      .docs
       .map((d) => PostModel.fromMap(d.id, d.data()))
-      .where((p) => p.isActive)
+      .where((p) =>
+          p.title.toLowerCase().contains(query) ||
+          p.vendorName.toLowerCase().contains(query) ||
+          p.category.toLowerCase().contains(query))
+      .take(15)
       .toList();
 
-  final vendors = results[1].docs
+  // Vendors: match on display name (case-insensitive).
+  final vendors = results[1]
+      .docs
       .map((d) => UserModel.fromMap({
             'uid': d.id,
             ...d.data(),
           }))
       .where((u) =>
           u.roles.contains('vendor') &&
-          u.vendorStatus == VendorStatus.approved)
-      .take(5)
+          u.vendorStatus == VendorStatus.approved &&
+          u.displayName.toLowerCase().contains(query))
+      .take(10)
       .toList();
 
   return SearchResults(posts: posts, vendors: vendors);
