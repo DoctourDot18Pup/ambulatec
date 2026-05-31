@@ -92,8 +92,15 @@ class NotificationSettingsPage extends ConsumerWidget {
 
   void _openNotification(BuildContext context, AppNotification n) {
     if (n.isUnread) markNotificationRead(n.id);
-    final isDelivered = n.type == 'order_delivered';
-    context.push(isDelivered ? '/review/${n.orderId}' : '/chat/${n.orderId}');
+    final String route;
+    if (n.type == 'order_delivered') {
+      route = '/review/${n.orderId}';
+    } else if (n.type == 'new_order') {
+      route = '/order-alert/${n.orderId}';
+    } else {
+      route = '/chat/${n.orderId}';
+    }
+    context.push(route);
   }
 
   Future<void> _markAllRead(List<AppNotification> notifications) async {

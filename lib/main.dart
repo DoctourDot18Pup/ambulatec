@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -9,6 +10,18 @@ import 'features/orders/providers/pending_notifications_provider.dart';
 import 'features/profile/providers/notification_preferences_provider.dart';
 import 'firebase_options.dart';
 import 'shared/widgets/notification_banner.dart';
+
+/// Holds a route string received from an FCM notification tap.
+/// Cleared after the app navigates to it.
+class _PendingFcmRoute extends Notifier<String?> {
+  @override
+  String? build() => null;
+  void set(String route) => state = route;
+  void clear() => state = null;
+}
+
+final pendingFcmRouteProvider =
+    NotifierProvider<_PendingFcmRoute, String?>(_PendingFcmRoute.new);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -72,7 +85,44 @@ class _NotificationWrapperState
   final Set<String> _shownIds = {};
 
   @override
+  void initState() {
+    super.initState();
+    _initFcmTapHandlers();
+  }
+
+  /// Handles the two cases where a user taps an FCM notification:
+  /// 1. App in background → [FirebaseMessaging.onMessageOpenedApp]
+  /// 2. App terminated → [FirebaseMessaging.instance.getInitialMessage]
+  Future<void> _initFcmTapHandlers() async {
+    // Case 1 — app was backgrounded when user tapped the notification.
+    FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      final route = message.data['route'] as String?;
+      if (route != null && mounted) {
+        ref.read(pendingFcmRouteProvider.notifier).set(route);
+      }
+    });
+
+    // Case 2 — app was terminated; launched by tapping the notification.
+    final initial = await FirebaseMessaging.instance.getInitialMessage();
+    final route = initial?.data['route'] as String?;
+    if (route != null && mounted) {
+      ref.read(pendingFcmRouteProvider.notifier).set(route);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Navigate when an FCM tap sets a pending route.
+    ref.listen<String?>(pendingFcmRouteProvider, (_, route) {
+      if (route == null) return;
+      ref.read(pendingFcmRouteProvider.notifier).clear();
+      final ctx = ref
+          .read(routerProvider)
+          .routerDelegate
+          .navigatorKey
+          .currentContext;
+      if (ctx != null) ref.read(routerProvider).go(route);
+    });
     // ref.listen re-registers on each build but Riverpod deduplicates it
     // for the same provider.
     final notificationsEnabled = ref.watch(notificationPreferencesProvider);
