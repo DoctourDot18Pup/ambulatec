@@ -4,8 +4,11 @@ const Stripe = require('stripe');
 
 admin.initializeApp();
 
-// ── FCM push notifications ─────────────────────────────────────────────────
+// ── FCM push notifications (requires Blaze plan — disabled) ───────────────
+// Push notifications are handled client-side via flutter_local_notifications.
+// Uncomment and deploy only if upgrading to Firebase Blaze plan.
 
+/*
 /**
  * sendPushNotification — Firestore trigger.
  *
@@ -106,6 +109,7 @@ exports.sendPushNotification = functions.firestore
 
     return null;
   });
+*/
 
 // REEMPLAZAR con tu secret key de Stripe (modo test)
 // NUNCA commits esta clave en git — usa Firebase environment config en producción:

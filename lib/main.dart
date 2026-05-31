@@ -13,15 +13,16 @@ import 'shared/widgets/notification_banner.dart';
 
 /// Holds a route string received from an FCM notification tap.
 /// Cleared after the app navigates to it.
-class _PendingFcmRoute extends Notifier<String?> {
+class _PendingRoute extends Notifier<String?> {
   @override
   String? build() => null;
   void set(String route) => state = route;
   void clear() => state = null;
 }
 
-final pendingFcmRouteProvider =
-    NotifierProvider<_PendingFcmRoute, String?>(_PendingFcmRoute.new);
+/// Pending navigation route from a notification tap (local or FCM).
+final pendingRouteProvider =
+    NotifierProvider<_PendingRoute, String?>(_PendingRoute.new);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -79,43 +80,55 @@ class _NotificationWrapper extends ConsumerStatefulWidget {
       _NotificationWrapperState();
 }
 
-class _NotificationWrapperState
-    extends ConsumerState<_NotificationWrapper> {
-  /// IDs of notifications that have already triggered a banner this session.
+class _NotificationWrapperState extends ConsumerState<_NotificationWrapper>
+    with WidgetsBindingObserver {
   final Set<String> _shownIds = {};
+  bool _isBackground = false;
 
   @override
   void initState() {
     super.initState();
-    _initFcmTapHandlers();
-  }
+    WidgetsBinding.instance.addObserver(this);
 
-  /// Handles the two cases where a user taps an FCM notification:
-  /// 1. App in background → [FirebaseMessaging.onMessageOpenedApp]
-  /// 2. App terminated → [FirebaseMessaging.instance.getInitialMessage]
-  Future<void> _initFcmTapHandlers() async {
-    // Case 1 — app was backgrounded when user tapped the notification.
+    // Forward local notification taps to the pending route provider.
+    NotificationService.onNotificationTap = (route) {
+      if (mounted) ref.read(pendingRouteProvider.notifier).set(route);
+    };
+
+    // Handle FCM tap when app was backgrounded or terminated.
     FirebaseMessaging.onMessageOpenedApp.listen((message) {
       final route = message.data['route'] as String?;
       if (route != null && mounted) {
-        ref.read(pendingFcmRouteProvider.notifier).set(route);
+        ref.read(pendingRouteProvider.notifier).set(route);
       }
     });
+    FirebaseMessaging.instance.getInitialMessage().then((message) {
+      final route = message?.data['route'] as String?;
+      if (route != null && mounted) {
+        ref.read(pendingRouteProvider.notifier).set(route);
+      }
+    });
+  }
 
-    // Case 2 — app was terminated; launched by tapping the notification.
-    final initial = await FirebaseMessaging.instance.getInitialMessage();
-    final route = initial?.data['route'] as String?;
-    if (route != null && mounted) {
-      ref.read(pendingFcmRouteProvider.notifier).set(route);
-    }
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _isBackground = state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden;
   }
 
   @override
   Widget build(BuildContext context) {
-    // Navigate when an FCM tap sets a pending route.
-    ref.listen<String?>(pendingFcmRouteProvider, (_, route) {
+    // Navigate when a notification tap sets a pending route.
+    ref.listen<String?>(pendingRouteProvider, (_, route) {
       if (route == null) return;
-      ref.read(pendingFcmRouteProvider.notifier).clear();
+      ref.read(pendingRouteProvider.notifier).clear();
       final ctx = ref
           .read(routerProvider)
           .routerDelegate
@@ -123,8 +136,7 @@ class _NotificationWrapperState
           .currentContext;
       if (ctx != null) ref.read(routerProvider).go(route);
     });
-    // ref.listen re-registers on each build but Riverpod deduplicates it
-    // for the same provider.
+
     final notificationsEnabled = ref.watch(notificationPreferencesProvider);
 
     ref.listen<AsyncValue<List<AppNotification>>>(
@@ -135,7 +147,7 @@ class _NotificationWrapperState
         for (final n in notifications) {
           if (_shownIds.contains(n.id)) continue;
           _shownIds.add(n.id);
-          _showBanner(n);
+          _handleNotification(n);
         }
       },
     );
@@ -143,24 +155,46 @@ class _NotificationWrapperState
     return widget.child;
   }
 
-  void _showBanner(AppNotification n) {
+  void _handleNotification(AppNotification n) {
     if (!mounted) return;
-    // Use the navigator key so the context is inside the Navigator/Overlay.
+
+    final isDelivered = n.type == 'order_delivered';
+    final isNewOrder = n.type == 'new_order';
+
+    final title = isDelivered
+        ? '¡Tu pedido llegó!'
+        : isNewOrder
+            ? '¡Nuevo pedido!'
+            : '¡Actualización de pedido!';
+
+    final body = isDelivered
+        ? 'Califica tu experiencia con ${n.productTitle}'
+        : isNewOrder
+            ? '${n.buyerName} quiere: ${n.productTitle}'
+            : n.productTitle;
+
+    final route = isDelivered
+        ? '/review/${n.orderId}'
+        : isNewOrder
+            ? '/order-alert/${n.orderId}'
+            : '/chat/${n.orderId}';
+
+    if (_isBackground) {
+      // App minimizada → notificación del sistema operativo.
+      NotificationService.showLocal(title: title, body: body, route: route);
+      return;
+    }
+
+    // App en primer plano → banner in-app.
     final ctx =
         ref.read(routerProvider).routerDelegate.navigatorKey.currentContext;
     if (ctx == null) return;
-    final isDelivered = n.type == 'order_delivered';
     NotificationBannerController.show(
       context: ctx,
-      title: isDelivered ? '¡Tu pedido llegó!' : '¡Nuevo pedido!',
-      body: isDelivered
-          ? 'Califica tu experiencia con ${n.productTitle}'
-          : '${n.buyerName} quiere: ${n.productTitle}',
+      title: title,
+      body: body,
       onTap: () {
         markNotificationRead(n.id);
-        final route = isDelivered
-            ? '/review/${n.orderId}'
-            : '/order-alert/${n.orderId}';
         ref.read(routerProvider).go(route);
       },
     );
