@@ -875,9 +875,18 @@ class _QuantityAdjustPanelState
                   ? null
                   : () async {
                       setState(() => _loading = true);
-                      await ref
-                          .read(chatControllerProvider)
-                          .updateQuantityAndBill(widget.order, _qty);
+                      final messenger = ScaffoldMessenger.of(context);
+                      try {
+                        await ref
+                            .read(chatControllerProvider)
+                            .updateQuantityAndBill(widget.order, _qty);
+                      } catch (e) {
+                        messenger.showSnackBar(SnackBar(
+                          content: Text(e.toString().replaceFirst('Exception: ', '')),
+                          backgroundColor: AppColors.error,
+                          behavior: SnackBarBehavior.floating,
+                        ));
+                      }
                       if (mounted) setState(() => _loading = false);
                     },
               child: _loading

@@ -75,8 +75,15 @@ class ChatController {
   }
 
   /// Vendor adjusts quantity after acceptance (while `awaiting_payment`).
-  /// Updates [quantity] and recalculates [finalPrice], then sends a system message.
+  /// Throws if [paymentLockedAt] is active (buyer is in checkout).
   Future<void> updateQuantityAndBill(OrderModel order, int quantity) async {
+    final locked = order.paymentLockedAt;
+    if (locked != null &&
+        DateTime.now().difference(locked).inMinutes < 5) {
+      throw Exception(
+          'No se puede ajustar la cantidad mientras el comprador está procesando el pago.');
+    }
+
     final newTotal = order.originalPrice * quantity;
     await FirebaseFirestore.instance
         .collection(AppConstants.ordersCollection)
