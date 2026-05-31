@@ -140,43 +140,67 @@ Con `buyer@...`:
 5. Tap en un resultado de vendedor → navega a `/vendor/:vendorId`.
 6. Borra el texto → vuelve al estado inicial.
 
+### 5.4 Sección de Vendedores (`/vendors`)
+
+> Visible solo para compradores en la pestaña de navegación "Vendedores".
+
+1. Con `buyer@...`, presiona la pestaña **"Vendedores"** en la barra inferior → navega a `/vendors`.
+2. Se muestra la lista de **todos los vendedores aprobados**, ordenados de mayor a menor calificación.
+3. Cada tarjeta muestra: avatar, nombre, estrellas, calificación numérica y número de reseñas.
+4. Los vendedores sin reseñas no muestran la sección de estrellas.
+5. Tap en una tarjeta → navega a `/vendor/:vendorId` con el perfil público del vendedor.
+
+**Resultado esperado:** lista actualizada en tiempo real desde Firestore, ordenada por rating sin requerir índice compuesto.
+
 ---
 
 ## Prueba 6 — Flujo completo de orden ✅
 
-### Paso 1 — Comprador realiza el pedido
-1. `buyer` abre un post → presiona **"Pedir"**.
-2. En `/order-summary`: revisa producto, precio y escribe una nota de entrega.
-3. Presiona **"Continuar al pago"** → `/payment`.
-4. Ingresa la tarjeta de prueba y confirma.
-5. Redirige a `/order-confirmed` con el número de orden.
+### Paso 1 — Comprador especifica cantidad y envía solicitud
+1. `buyer` abre un post → en `/post/:id` aparece el selector de **CANTIDAD** con botones **−** y **+**.
+2. Ajusta la cantidad (ej. 3 unidades) → el total se actualiza en tiempo real junto a los botones.
+3. Completa los extras (si el vendedor los definió) y escribe la nota de entrega (obligatorio).
+4. Opcionalmente adjunta una foto de referencia de ubicación.
+5. Presiona **"Enviar solicitud"** → navega a `/order-summary`.
+6. Verifica que el resumen muestre:
+   - La cantidad seleccionada debajo del nombre del producto.
+   - El desglose `N × $precio` en la tarjeta de precio total.
+7. Presiona **"Enviar solicitud al vendedor"** → navega a `/order-confirmed` con texto **"¡Solicitud enviada!"**.
+8. En `/orders` → pestaña "Activos": la orden aparece con estado **"En espera"**.
 
-### Paso 2 — Vendedor recibe y gestiona la orden
+### Paso 2 — Vendedor recibe la solicitud y puede ajustar cantidad
 
 #### Opción A — Por notificación
-6. `vendor1` recibe un **banner in-app** en la parte superior de la pantalla.
-7. Tap en el banner → abre `/order-alert/:orderId` con los datos del pedido.
-8. Dos acciones disponibles:
-   - **Confirmar** → estado cambia a `confirmed`; abre el chat.
-   - **Rechazar** → estado cambia a `rejected`; la orden termina.
+9. `vendor1` recibe un **banner in-app** → tap abre `/order-alert/:orderId`.
+10. La tarjeta del producto muestra la cantidad solicitada con un stepper **−/+** editable.
+11. Si el vendedor tiene menos unidades, ajusta la cantidad con el stepper → el precio se recalcula.
+12. Dos acciones disponibles:
+    - **Aceptar pedido** → guarda la cantidad final, estado pasa a `awaiting_payment`, abre el chat.
+    - **Rechazar** → estado pasa a `rejected`; la orden termina.
 
-#### Opción B — Desde el listado (si no vio la notificación)
-6. `vendor1` navega a `/orders` → pestaña **"Pendientes"**.
-7. Tap en la orden → `/order-detail/:orderId`.
-8. Presiona **"Confirmar orden"** o **"Rechazar"** (con diálogo de confirmación).
+#### Opción B — Desde el listado
+9. `vendor1` navega a `/orders` → pestaña **"Pendientes"** → tap en la orden → `/order-detail/:orderId`.
 
-### Paso 3 — Chat y entrega
-9. Con la orden confirmada, ambos acceden a `/chat/:orderId`.
-10. El chip de **cuenta atrás de 10 minutos** es visible en la parte superior.
-11. Ambas partes pueden enviar mensajes de texto.
-12. `vendor1` presiona **"Marcar como entregado"** → diálogo de confirmación → orden pasa a `delivered`.
+### Paso 3 — Chat y ajuste post-aceptación (`awaiting_payment`)
+13. En `/chat/:orderId`, el vendedor ve el panel **"AJUSTAR CANTIDAD"** con el stepper y el total actual.
+14. Si necesita modificar de nuevo → cambia la cantidad → el botón **"Generar nuevo cobro"** aparece.
+15. Presiona **"Generar nuevo cobro"** → aparece un mensaje del sistema con el total actualizado (ej. *"El vendedor ajustó la cantidad a 2. Nuevo total: $30"*).
+16. El comprador ve el panel de pago con el precio actualizado: **"Proceder al pago — $XX"**.
 
-### Paso 4 — Reseña del comprador
-13. `buyer` recibe notificación de entrega.
-14. Va a `/orders` → pestaña "Historial" → la orden aparece como **"Entregada"**.
-15. Abre el detalle → botón **"Dejar reseña"** → `/review/:orderId`.
-16. Selecciona de 1 a 5 estrellas y escribe un comentario → envía.
-17. La reseña aparece en `/vendor/:vendorId` de `vendor1`.
+### Paso 4 — Pago del comprador
+17. `buyer` presiona **"Proceder al pago — $XX"** → navega a `/payment`.
+18. Ingresa la tarjeta de prueba (`4242 4242 4242 4242`) y confirma.
+19. La orden pasa a `confirmed`; aparece mensaje del sistema *"💳 ¡Pago recibido!"*.
+
+### Paso 5 — Entrega
+20. `vendor1` ve el botón **"Marcar como entregado"** → confirma en el diálogo → orden pasa a `delivered`.
+21. **`buyer` es redirigido automáticamente** a `/review/:orderId` para dejar la reseña.
+
+### Paso 6 — Reseña del comprador
+22. En `/review/:orderId`: selecciona de 1 a 5 estrellas, elige etiquetas opcionales y escribe comentario.
+23. Presiona **"Enviar reseña"** → snackbar *"¡Gracias por tu reseña!"* → redirige a `/home`.
+24. La reseña aparece en `/vendor/:vendorId` de `vendor1` (sección overview para compradores).
+25. `vendor1` puede ver la reseña en su página **"Mis reseñas"** (`/my-reviews`).
 
 ---
 
@@ -241,6 +265,20 @@ Con cualquier cuenta:
 5. El avatar se actualiza en el header del perfil y en el chip de usuario en el chat.
 
 **Resultado esperado:** la foto de perfil cambia correctamente y se muestra en toda la app.
+
+### 9.3 Mis reseñas — Solo vendedores (`/my-reviews`)
+
+1. Con `vendor1@...` (con al menos una reseña recibida), navega a `/profile`.
+2. En la lista de opciones aparece el tile **"Mis reseñas"** con ícono de estrella.
+3. Tap → navega a `/my-reviews`.
+4. La página muestra:
+   - **Card de resumen**: calificación promedio en grande, estrellas, total de reseñas y barras de frecuencia de etiquetas (*"LO QUE MÁS DESTACAN"*).
+   - **Lista paginada**: las primeras 5 reseñas con título del pedido, comprador, fecha, estrellas, etiquetas y comentario.
+5. Si hay más de 5 reseñas → aparece el botón **"Mostrar más (N restantes)"** al final.
+6. Presiona el botón → se cargan 5 reseñas adicionales.
+7. Cuando todas están visibles → el botón desaparece.
+
+**Resultado esperado:** el card de resumen siempre refleja el total de reseñas; la paginación carga en bloques de 5.
 
 ---
 
@@ -369,6 +407,7 @@ Con cualquier cuenta autenticada:
 | `/role-select` | Usuario recién registrado |
 | `/vendor-verify` | Vendedor pendiente |
 | `/home` | Comprador |
+| `/vendors` | Comprador |
 | `/post/:id` | Comprador |
 | `/search` | Comprador |
 | `/order-summary` | Comprador |
@@ -399,16 +438,25 @@ Antes de cada release, verifica que estos puntos críticos sigan funcionando:
 - [ ] El botón de login no reaparece brevemente tras autenticarse (spinner continuo hasta redirigir)
 - [ ] Guard de vendedor pendiente (`/vendor-verify`)
 - [ ] Guard de admin (`/admin` solo para `isAdmin: true`)
-- [ ] Creación de publicación con imagen
-- [ ] Flujo completo de orden: pedir → pagar → confirmar → entregar → reseñar
+- [ ] Creación de publicación con imagen y extras/condimentos opcionales
+- [ ] Publicación inactiva muestra overlay **"No disponible"** en el feed
+- [ ] Stepper de cantidad en `/post/:id` actualiza el total en tiempo real
+- [ ] `/order-summary` muestra cantidad y desglose `N × $precio = $total`
+- [ ] Vendedor puede ajustar cantidad en `/order-alert/:id` antes de aceptar
+- [ ] Panel de ajuste de cantidad en chat (`awaiting_payment`) genera nuevo cobro con mensaje del sistema
+- [ ] Al marcar entregado, el comprador es **redirigido automáticamente** a `/review/:orderId`
+- [ ] Flujo completo de orden: solicitud → ajuste cantidad → pago → entrega → reseña automática
 - [ ] Chat visible solo mientras la orden está activa
+- [ ] Foto de entrega adjunta es visible para el vendedor en `/order-detail/:id`
 - [ ] Banner de notificación in-app al recibir una orden
 - [ ] El banner **no aparece** cuando el toggle de notificaciones está desactivado
 - [ ] Stats del dashboard reflejan datos reales de Firestore
 - [ ] Búsqueda devuelve resultados para posts y vendedores
+- [ ] `/vendors` muestra lista de vendedores aprobados ordenados por rating
 - [ ] Cierre de sesión y limpieza de estado
 - [ ] Editar nombre desde perfil → persiste en Firestore y se actualiza en toda la app
 - [ ] Cambiar foto de perfil → sube a Cloudinary y se muestra el avatar actualizado
+- [ ] `/my-reviews` muestra card de resumen + lista paginada (5 por página) de reseñas del vendedor
 - [ ] Toggle de notificaciones persiste entre sesiones (SharedPreferences)
 - [ ] Historial de notificaciones muestra leídas y no leídas; tap marca como leída
 - [ ] "Marcar todo" elimina todos los puntos de no leído
