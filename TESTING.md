@@ -112,6 +112,26 @@ Con `vendor1@...` (aprobado):
 - La publicación aparece en el feed de `/home` (comprobable con `buyer@...`).
 - La imagen se sube correctamente a Cloudinary y se muestra en la tarjeta.
 
+### 4.1 Complementos con precio ✅
+
+> Sección **"PERSONALIZACIONES"** al final del formulario de creación.
+
+1. Presiona **"Agregar grupo"** → aparece una tarjeta de grupo.
+2. Escribe el nombre del grupo (ej. *"Tamaño"* o *"Salsas"*).
+3. Activa **"Selección múltiple"** si quieres permitir varias opciones a la vez (ej. salsas); déjalo apagado para selección única (ej. tamaño).
+4. Por cada opción escribe su **nombre** y, opcionalmente, un **precio extra** en el campo `$` a la derecha (déjalo vacío o en 0 para que sea gratis).
+5. Presiona **"Agregar opción"** para más opciones, o el ícono rojo para quitar una.
+6. Publica y vuelve a abrir la publicación como `buyer@...`.
+
+**Resultado esperado:**
+- Los complementos **se guardan** y aparecen tanto al vendedor como al comprador.
+- En `Firestore → posts → {id} → extras`, cada opción es un objeto `{label, price}`.
+
+> **Nota de regresión:** anteriormente los complementos se perdían al publicar
+> (el provider `autoDispose` se reseteaba). Verifica que una publicación nueva
+> conserve los complementos. Las publicaciones creadas **antes** del fix no
+> tienen complementos guardados.
+
 ---
 
 ## Prueba 5 — Feed y búsqueda (Comprador) ✅
@@ -132,13 +152,27 @@ Con `buyer@...`:
 
 > **Nota:** el botón de seguir no debe aparecer si el comprador visita su propio perfil de vendedor.
 
-### 5.3 Búsqueda
+### 5.3 Búsqueda ✅
 1. Abre `/search`.
 2. **Estado inicial** (sin texto): muestra la grilla de 6 categorías + lista horizontal de vendedores activos.
 3. Escribe al menos 2 caracteres → aparecen resultados de posts y vendedores.
-4. Tap en un resultado de post → navega a `/post/:id`.
-5. Tap en un resultado de vendedor → navega a `/vendor/:vendorId`.
-6. Borra el texto → vuelve al estado inicial.
+4. **Búsqueda insensible a mayúsculas y por substring:** escribe una palabra que esté **en medio** del título (ej. `birria` para encontrar *"TACOS DE BIRRIA"*) y en minúsculas → debe encontrarlo igual. También matchea por **nombre del vendedor** y **categoría**.
+5. Tap en un resultado de post → navega a `/post/:id`.
+6. Tap en un resultado de vendedor → navega a `/vendor/:vendorId`.
+7. Borra el texto → vuelve al estado inicial.
+
+> **Nota de regresión:** antes la búsqueda solo coincidía por prefijo exacto y
+> respetaba mayúsculas (ej. `tacos` no encontraba *"TACOS…"*). Ahora filtra del
+> lado cliente con `contains` en minúsculas.
+
+#### 5.3.1 Filtro por categoría ✅
+1. En el estado inicial, toca una de las tarjetas de **categoría** (ej. *"Bebidas"*).
+2. **Resultado esperado:** navega a `/home` con el feed **filtrado por esa categoría** (no escribe el nombre en el buscador).
+3. Toca *"Ver todo"* → el feed muestra todas las categorías.
+
+> **Nota de regresión:** antes las categorías escribían su nombre como texto de
+> búsqueda y hacían prefix-match sobre el título del producto, por lo que nunca
+> coincidían. Ahora aplican el filtro real (`categoryFilterProvider`).
 
 ### 5.4 Sección de Vendedores (`/vendors`)
 
@@ -156,17 +190,23 @@ Con `buyer@...`:
 
 ## Prueba 6 — Flujo completo de orden ✅
 
-### Paso 1 — Comprador especifica cantidad y envía solicitud
-1. `buyer` abre un post → en `/post/:id` aparece el selector de **CANTIDAD** con botones **−** y **+**.
-2. Ajusta la cantidad (ej. 3 unidades) → el total se actualiza en tiempo real junto a los botones.
-3. Completa los extras (si el vendedor los definió) y escribe la nota de entrega (obligatorio).
-4. Opcionalmente adjunta una foto de referencia de ubicación.
-5. Presiona **"Enviar solicitud"** → navega a `/order-summary`.
-6. Verifica que el resumen muestre:
+### Paso 1 — Comprador especifica cantidad, complementos y envía solicitud
+1. `buyer` abre un post (que tenga complementos definidos, ver Prueba 4.1) → en `/post/:id`.
+2. **Complementos con precio:** la sección de personalizaciones muestra cada opción como chip; si tiene precio aparece **"+$X"** junto a la opción. Selecciona algunas (única o múltiple según el grupo).
+3. Ajusta la **CANTIDAD** con los botones **−** / **+**.
+4. **Desglose en tiempo real:** debajo del stepper aparece el desglose — *Producto $X*, cada complemento de pago *+$Y*, subtotal por unidad y **Total** — todo se recalcula al cambiar opciones o cantidad.
+5. Escribe la nota de entrega (obligatorio) y, opcionalmente, adjunta una foto de referencia.
+6. Presiona **"Enviar solicitud"** → navega a `/order-summary`.
+7. Verifica que el resumen muestre:
    - La cantidad seleccionada debajo del nombre del producto.
-   - El desglose `N × $precio` en la tarjeta de precio total.
-7. Presiona **"Enviar solicitud al vendedor"** → navega a `/order-confirmed` con texto **"¡Solicitud enviada!"**.
-8. En `/orders` → pestaña "Activos": la orden aparece con estado **"En espera"**.
+   - La tarjeta **"PERSONALIZACIONES"** con cada opción elegida y su precio (o *"Gratis"*).
+   - La tarjeta de total **desglosada**: Producto, cada extra de pago, subtotal por unidad, cantidad y **Total a pagar**.
+8. Presiona **"Enviar solicitud al vendedor"** → navega a `/order-confirmed` con texto **"¡Solicitud enviada!"**.
+9. En `/orders` → pestaña "Activos": la orden aparece con estado **"En espera"**.
+
+> **Cálculo:** el precio unitario guardado en la orden = precio base + suma de
+> complementos de pago; el total = unitario × cantidad. Esto hace que, si el
+> vendedor reajusta la cantidad más adelante, los complementos se conserven.
 
 ### Paso 2 — Vendedor recibe la solicitud y puede ajustar cantidad
 
@@ -202,6 +242,18 @@ Con `buyer@...`:
 24. La reseña aparece en `/vendor/:vendorId` de `vendor1` (sección overview para compradores).
 25. `vendor1` puede ver la reseña en su página **"Mis reseñas"** (`/my-reviews`).
 
+### 6.1 Rechazo y reactivación de publicación ✅
+
+1. `vendor1` recibe una solicitud y presiona **Rechazar** (en `/order-alert/:id` o `/order-detail/:id`).
+2. La orden pasa a `rejected` y la **publicación asociada se desactiva** (deja de aparecer en el feed).
+3. `vendor1` abre la orden rechazada en `/order-detail/:orderId` (o en el chat).
+4. Aparece el aviso *"Rechazaste este pedido y la publicación se desactivó…"* con el botón **"Reactivar publicación"**.
+5. Presiona **"Reactivar publicación"** → confirma en el diálogo.
+6. **Resultado esperado:**
+   - La publicación vuelve a aparecer en el catálogo (`isActive: true`).
+   - El comprador recibe una notificación de tipo `post_reactivated` y un mensaje del sistema en el chat.
+   - El botón **desaparece** (la orden queda marcada con `postReactivated: true`); no se puede reactivar dos veces.
+
 ---
 
 ## Prueba 7 — Página de órdenes ✅
@@ -221,6 +273,7 @@ Con `buyer@...`:
 
 - Tap en cualquier tarjeta → `/order-detail/:orderId`.
 - El detalle muestra: imagen del producto, timeline (Creado / Confirmado / Entregado), datos del comprador/vendedor y botones de acción según rol y estado.
+- Si la orden tiene complementos, aparece la sección **"PERSONALIZACIONES"** con el desglose: Producto, cada complemento con su precio (o *"Gratis"*) y el subtotal por unidad × cantidad.
 
 ---
 
@@ -233,6 +286,12 @@ Con `vendor1` (con al menos una orden entregada):
 2. Verifica que los **stats** muestren valores correctos: órdenes activas, ganancias totales, pedidos pendientes.
 3. La **gráfica semanal** muestra los puntos de ganancias por día.
 4. Presiona **"Ver ganancias →"** → navega a `/earnings`.
+5. **Campana de notificaciones:** el ícono de campana en el encabezado muestra un **badge rojo** con el número de notificaciones sin leer (o *"9+"*), se ve relleno/dorado cuando hay pendientes. Tap → navega a `/notifications`.
+
+> **Nota de regresión (rendimiento):** la carga del dashboard y del panel de
+> admin ya no depende de índices compuestos de Firestore (se quitó el `orderBy`
+> de las consultas y se ordena del lado cliente). Antes el panel se quedaba
+> "colgado" esperando el índice; ahora carga de inmediato.
 
 ### 8.2 Página de ganancias
 1. Muestra la gráfica `fl_chart` con puntos interactivos por día.
@@ -285,10 +344,19 @@ Con cualquier cuenta:
 ## Prueba 10 — Panel de administración
 
 Con `admin@...`:
-1. Navega a `/admin`.
-2. La lista de vendedores pendientes es correcta.
-3. Aprueba un vendedor → desaparece de la lista + `vendorStatus` cambia a `approved` en Firestore.
-4. Rechaza otro vendedor → desaparece de la lista + `vendorStatus` cambia a `rejected`.
+1. Navega a `/admin` → el panel tiene **dos pestañas**: **"Vendedores"** y **"Reportes"**, cada una con un contador entre paréntesis (pendientes / abiertos).
+
+### 10.1 Pestaña Vendedores
+1. La lista de vendedores pendientes es correcta.
+2. Aprueba un vendedor → desaparece de la lista + `vendorStatus` cambia a `approved` en Firestore.
+3. Rechaza otro vendedor → desaparece de la lista + `vendorStatus` cambia a `rejected`.
+
+### 10.2 Pestaña Reportes ✅
+1. Cambia a la pestaña **"Reportes"** → se listan los tickets de la colección `support_tickets`, más recientes primero.
+2. Cada tarjeta muestra: tema, sub-opción, detalle, autor (nombre + email), fecha y estado (**Abierto** / **Resuelto**).
+3. Si el reporte vino del **chat** (ver Prueba 13.6), muestra además el **contexto del pedido** (`#AT-XXXXXX` y sobre quién es).
+4. Presiona **"Marcar como resuelto"** → el estado cambia a *Resuelto* y el contador de la pestaña baja.
+5. Presiona **"Reabrir"** → vuelve a *Abierto*.
 
 Verifica que una cuenta sin `isAdmin: true` no pueda acceder a esta ruta (ver Prueba 2).
 
@@ -409,6 +477,16 @@ Con cualquier cuenta autenticada:
 2. Solo aparece el chip dorado con la categoría (sin chip de sub-opción).
 3. Completa el envío → pantalla de éxito funciona igual.
 
+### 13.6 Reporte desde el chat (contextual) ✅
+
+> Reportar directamente donde ocurre el problema, no solo desde el perfil.
+
+1. Dentro de un `/chat/:orderId`, abre el menú **⋮** (esquina superior derecha) → **"Reportar un problema"**.
+2. Se abre el mismo sheet de soporte, pero con un aviso dorado *"Reporte vinculado a tu pedido con [contraparte]"* en el primer paso.
+3. Completa y envía el reporte.
+4. Verifica en `Firestore → support_tickets` que el documento incluye además `orderId`, `reportedUserId` y `reportedUserName`.
+5. El reporte aparece en `/admin` → pestaña **"Reportes"** mostrando el contexto del pedido (ver Prueba 10.2).
+
 ---
 
 ## Resumen de rutas a cubrir
@@ -451,9 +529,11 @@ Antes de cada release, verifica que estos puntos críticos sigan funcionando:
 - [ ] El botón de login no reaparece brevemente tras autenticarse (spinner continuo hasta redirigir)
 - [ ] Guard de vendedor pendiente (`/vendor-verify`)
 - [ ] Guard de admin (`/admin` solo para `isAdmin: true`)
-- [ ] Creación de publicación con imagen y extras/condimentos opcionales
+- [ ] Creación de publicación con imagen y complementos opcionales **con precio**
+- [ ] Los complementos se **guardan** y aparecen al vendedor y al comprador (regresión del bug `autoDispose`)
 - [ ] Publicación inactiva muestra overlay **"No disponible"** en el feed
 - [ ] Stepper de cantidad en `/post/:id` actualiza el total en tiempo real
+- [ ] Complementos con precio muestran `+$X` y el **desglose** (producto + extras + total) en `/post/:id`, `/order-summary` y `/order-detail`
 - [ ] `/order-summary` muestra cantidad y desglose `N × $precio = $total`
 - [ ] Vendedor puede ajustar cantidad en `/order-alert/:id` antes de aceptar
 - [ ] Panel de ajuste de cantidad en chat (`awaiting_payment`) genera nuevo cobro con mensaje del sistema
@@ -465,7 +545,12 @@ Antes de cada release, verifica que estos puntos críticos sigan funcionando:
 - [ ] El banner **no aparece** cuando el toggle de notificaciones está desactivado
 - [ ] Stats del dashboard reflejan datos reales de Firestore
 - [ ] Búsqueda devuelve resultados para posts y vendedores
+- [ ] Búsqueda funciona por **substring** e **insensible a mayúsculas** (`birria` encuentra "TACOS DE BIRRIA")
+- [ ] Las tarjetas de **categoría** en `/search` filtran el feed (no escriben en el buscador)
 - [ ] `/vendors` muestra lista de vendedores aprobados ordenados por rating
+- [ ] Vendedor puede **reactivar** una publicación rechazada desde `/order-detail`; el botón desaparece tras reactivar
+- [ ] Campana del dashboard muestra badge de no leídas y navega a `/notifications`
+- [ ] Dashboard y `/admin` cargan sin demora (sin dependencia de índices compuestos)
 - [ ] Cierre de sesión y limpieza de estado
 - [ ] Editar nombre desde perfil → persiste en Firestore y se actualiza en toda la app
 - [ ] Cambiar foto de perfil → sube a Cloudinary y se muestra el avatar actualizado
@@ -475,3 +560,5 @@ Antes de cada release, verifica que estos puntos críticos sigan funcionando:
 - [ ] "Marcar todo" elimina todos los puntos de no leído
 - [ ] Formulario de soporte envía ticket a Firestore (`support_tickets`) con `status: 'open'`
 - [ ] Flujo de soporte sin sub-opciones (Sugerencia / Otro) salta directamente a detalles
+- [ ] Reporte desde el chat (**⋮ → Reportar un problema**) guarda el contexto del pedido (`orderId`, `reportedUserId`)
+- [ ] Panel de admin tiene pestaña **"Reportes"**; permite marcar resuelto / reabrir
