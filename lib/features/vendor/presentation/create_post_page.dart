@@ -324,6 +324,10 @@ class _FormBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final hasOffer = ref.watch(_hasOfferProvider);
     final offerType = ref.watch(_offerTypeProvider);
+    // Keep the autoDispose extras provider alive while the form is shown.
+    // Without this watch nothing subscribes to it, so Riverpod disposes it and
+    // resets to [] between edits — the cause of extras never being saved.
+    ref.watch(_extrasProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -762,32 +766,39 @@ class _OfferTypeChip extends ConsumerWidget {
 
 // ── Extras panel ───────────────────────────────────────────────────────────
 
+/// A single option row: its label and an optional surcharge price.
+class _OptionRow {
+  final TextEditingController label = TextEditingController();
+  final TextEditingController price = TextEditingController();
+
+  void dispose() {
+    label.dispose();
+    price.dispose();
+  }
+}
+
 class _GroupState {
   final String id;
   final TextEditingController labelController;
-  final List<TextEditingController> optionControllers;
+  final List<_OptionRow> options;
   bool isMultiple;
 
   _GroupState({required this.id})
       : labelController = TextEditingController(),
-        optionControllers = [
-          TextEditingController(),
-          TextEditingController(),
-        ],
+        options = [_OptionRow(), _OptionRow()],
         isMultiple = false;
 
-  void addOption() =>
-      optionControllers.add(TextEditingController());
+  void addOption() => options.add(_OptionRow());
 
   void removeOption(int i) {
-    optionControllers[i].dispose();
-    optionControllers.removeAt(i);
+    options[i].dispose();
+    options.removeAt(i);
   }
 
   void dispose() {
     labelController.dispose();
-    for (final c in optionControllers) {
-      c.dispose();
+    for (final o in options) {
+      o.dispose();
     }
   }
 }
@@ -817,9 +828,12 @@ class _ExtrasPanelState extends ConsumerState<_ExtrasPanel> {
               id: g.id,
               label: g.labelController.text.trim(),
               isMultiple: g.isMultiple,
-              options: g.optionControllers
-                  .map((c) => c.text.trim())
-                  .where((s) => s.isNotEmpty)
+              options: g.options
+                  .map((o) => PostExtraOption(
+                        label: o.label.text.trim(),
+                        price: double.tryParse(o.price.text.trim()) ?? 0,
+                      ))
+                  .where((o) => o.label.isNotEmpty)
                   .toList(),
             ))
         .where((e) => e.label.isNotEmpty && e.options.isNotEmpty)
@@ -975,18 +989,27 @@ class _GroupCardState extends State<_GroupCard> {
           const SizedBox(height: 8),
 
           // ── Options ──────────────────────────────────────────────────
-          Text('Opciones',
-              style: AppTextStyles.caption
-                  .copyWith(color: AppColors.textSecondary)),
+          Row(
+            children: [
+              Text('Opciones',
+                  style: AppTextStyles.caption
+                      .copyWith(color: AppColors.textSecondary)),
+              const Spacer(),
+              Text('Precio extra (opcional)',
+                  style: AppTextStyles.caption
+                      .copyWith(color: AppColors.textSecondary)),
+            ],
+          ),
           const SizedBox(height: 6),
-          for (int j = 0; j < g.optionControllers.length; j++)
+          for (int j = 0; j < g.options.length; j++)
             Padding(
               padding: const EdgeInsets.only(bottom: 6),
               child: Row(
                 children: [
                   Expanded(
+                    flex: 3,
                     child: TextField(
-                      controller: g.optionControllers[j],
+                      controller: g.options[j].label,
                       onChanged: (_) => widget.onChanged(),
                       style: AppTextStyles.body
                           .copyWith(color: AppColors.textPrimary),
@@ -1016,7 +1039,48 @@ class _GroupCardState extends State<_GroupCard> {
                       ),
                     ),
                   ),
-                  if (g.optionControllers.length > 2) ...[
+                  const SizedBox(width: 6),
+                  SizedBox(
+                    width: 86,
+                    child: TextField(
+                      controller: g.options[j].price,
+                      onChanged: (_) => widget.onChanged(),
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*\.?\d{0,2}')),
+                      ],
+                      style: AppTextStyles.body
+                          .copyWith(color: AppColors.textPrimary),
+                      decoration: InputDecoration(
+                        prefixText: '\$',
+                        hintText: '0',
+                        hintStyle: AppTextStyles.caption
+                            .copyWith(color: AppColors.textSecondary),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 8),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide:
+                              BorderSide(color: AppColors.borderOverlay),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide:
+                              BorderSide(color: AppColors.borderOverlay),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(
+                              color:
+                                  AppColors.accentGold.withValues(alpha: 0.6)),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (g.options.length > 2) ...[
                     const SizedBox(width: 6),
                     GestureDetector(
                       onTap: () {

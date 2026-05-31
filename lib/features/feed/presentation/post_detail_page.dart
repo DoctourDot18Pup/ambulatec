@@ -6,11 +6,35 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../orders/domain/order_model.dart';
 import '../../orders/providers/current_order_provider.dart';
 import '../data/following_provider.dart';
 import '../data/follow_controller.dart';
 import '../data/posts_provider.dart';
 import '../domain/post_model.dart';
+
+// ── Extras helper ──────────────────────────────────────────────────────────
+
+/// Builds the priced breakdown of the buyer's selection by matching the chosen
+/// option labels against the post's extra groups.
+List<OrderExtra> _buildExtrasDetail(
+    PostModel post, Map<String, Set<String>> selected) {
+  final detail = <OrderExtra>[];
+  for (final extra in post.extras) {
+    final chosen = selected[extra.id];
+    if (chosen == null || chosen.isEmpty) continue;
+    for (final opt in extra.options) {
+      if (chosen.contains(opt.label)) {
+        detail.add(OrderExtra(
+          group: extra.label,
+          option: opt.label,
+          price: opt.price,
+        ));
+      }
+    }
+  }
+  return detail;
+}
 
 // ── Page-scoped delivery providers ────────────────────────────────────────
 
@@ -376,15 +400,15 @@ class _DetailView extends ConsumerWidget {
 
                       const SizedBox(height: 24),
 
-                      // ── Quantity stepper ─────────────────────────────
-                      _QuantityStepper(unitPrice: post.price),
-                      const SizedBox(height: 24),
-
                       // ── Extras selector ──────────────────────────────
                       if (post.extras.isNotEmpty) ...[
                         _ExtrasSelector(post: post),
                         const SizedBox(height: 24),
                       ],
+
+                      // ── Quantity stepper + total breakdown ───────────
+                      _QuantityStepper(post: post),
+                      const SizedBox(height: 24),
 
                       // ── Delivery field ───────────────────────────────
                       Text(
@@ -489,6 +513,8 @@ class _DetailView extends ConsumerWidget {
                           deliveryNote: deliveryNote,
                           deliveryImageBytes: deliveryImageBytes,
                           selectedExtras: extras,
+                          extrasDetail:
+                              _buildExtrasDetail(post, selectedExtras),
                           quantity: quantity,
                         ));
                         context.go('/order-summary');
@@ -561,17 +587,20 @@ class _ExtrasSelector extends ConsumerWidget {
                 spacing: 8,
                 runSpacing: 6,
                 children: extra.options.map((opt) {
-                  final isSelected = current.contains(opt);
+                  final isSelected = current.contains(opt.label);
+                  final priceLabel = opt.price > 0
+                      ? ' +\$${opt.price.toStringAsFixed(opt.price % 1 == 0 ? 0 : 2)}'
+                      : '';
                   return GestureDetector(
                     onTap: () {
                       final map = Map<String, Set<String>>.from(
                           ref.read(_selectedExtrasProvider));
                       final set = Set<String>.from(map[extra.id] ?? {});
                       if (extra.isMultiple) {
-                        isSelected ? set.remove(opt) : set.add(opt);
+                        isSelected ? set.remove(opt.label) : set.add(opt.label);
                       } else {
                         set.clear();
-                        if (!isSelected) set.add(opt);
+                        if (!isSelected) set.add(opt.label);
                       }
                       map[extra.id] = set;
                       ref.read(_selectedExtrasProvider.notifier).update(map);
@@ -592,7 +621,7 @@ class _ExtrasSelector extends ConsumerWidget {
                         ),
                       ),
                       child: Text(
-                        opt,
+                        '${opt.label}$priceLabel',
                         style: AppTextStyles.body.copyWith(
                           color: isSelected
                               ? AppColors.accentGold
@@ -618,13 +647,21 @@ class _ExtrasSelector extends ConsumerWidget {
 // ── Quantity stepper ───────────────────────────────────────────────────────
 
 class _QuantityStepper extends ConsumerWidget {
-  final double unitPrice;
-  const _QuantityStepper({required this.unitPrice});
+  final PostModel post;
+  const _QuantityStepper({required this.post});
+
+  String _fmt(double v) => '\$${v.toStringAsFixed(v % 1 == 0 ? 0 : 2)}';
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final qty = ref.watch(_quantityProvider);
+    final selected = ref.watch(_selectedExtrasProvider);
+    final extrasDetail = _buildExtrasDetail(post, selected);
+    final extrasPerUnit =
+        extrasDetail.fold<double>(0, (s, e) => s + e.price);
+    final unitPrice = post.price + extrasPerUnit;
     final total = unitPrice * qty;
+    final hasBreakdown = extrasPerUnit > 0 || qty > 1;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -655,17 +692,63 @@ class _QuantityStepper extends ConsumerWidget {
               onTap: () =>
                   ref.read(_quantityProvider.notifier).update(qty + 1),
             ),
-            const Spacer(),
-            if (qty > 1)
-              Text(
-                'Total: \$${total.toStringAsFixed(total % 1 == 0 ? 0 : 2)}',
-                style: AppTextStyles.body.copyWith(
-                    color: AppColors.accentGold,
-                    fontWeight: FontWeight.w600),
-              ),
           ],
         ),
+
+        // ── Itemized breakdown ─────────────────────────────────────
+        if (hasBreakdown) ...[
+          const SizedBox(height: 14),
+          _BreakdownRow(
+              label: 'Producto', value: _fmt(post.price)),
+          for (final e in extrasDetail)
+            if (e.price > 0)
+              _BreakdownRow(
+                  label: '${e.group}: ${e.option}',
+                  value: '+${_fmt(e.price)}'),
+          if (qty > 1)
+            _BreakdownRow(
+                label: 'Subtotal por unidad', value: _fmt(unitPrice)),
+          const Divider(color: AppColors.borderOverlay, height: 20),
+          Row(
+            children: [
+              Text(qty > 1 ? 'Total ($qty)' : 'Total',
+                  style: AppTextStyles.body
+                      .copyWith(color: AppColors.textPrimary)),
+              const Spacer(),
+              Text(_fmt(total),
+                  style: AppTextStyles.h3
+                      .copyWith(color: AppColors.accentGold)),
+            ],
+          ),
+        ],
       ],
+    );
+  }
+}
+
+class _BreakdownRow extends StatelessWidget {
+  final String label;
+  final String value;
+  const _BreakdownRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(label,
+                style: AppTextStyles.caption
+                    .copyWith(color: AppColors.textSecondary),
+                overflow: TextOverflow.ellipsis),
+          ),
+          const SizedBox(width: 8),
+          Text(value,
+              style: AppTextStyles.caption
+                  .copyWith(color: AppColors.textPrimary)),
+        ],
+      ),
     );
   }
 }

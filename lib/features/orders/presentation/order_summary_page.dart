@@ -97,14 +97,17 @@ class _SummaryView extends ConsumerWidget {
                     const SizedBox(height: 16),
 
                     // ── Selected extras ───────────────────────────────
-                    if (draft.selectedExtras.isNotEmpty) ...[
-                      _ExtrasCard(
-                          post: post, selectedExtras: draft.selectedExtras),
+                    if (draft.extrasDetail.isNotEmpty) ...[
+                      _ExtrasCard(extras: draft.extrasDetail),
                       const SizedBox(height: 16),
                     ],
 
                     // ── Price card ─────────────────────────────────────
-                    _PriceCard(unitPrice: post.price, quantity: draft.quantity),
+                    _PriceCard(
+                      basePrice: post.price,
+                      extras: draft.extrasDetail,
+                      quantity: draft.quantity,
+                    ),
                     const SizedBox(height: 16),
 
                     // ── Delivery card ─────────────────────────────────
@@ -168,6 +171,11 @@ class _SummaryView extends ConsumerWidget {
             .uploadImage(draft.deliveryImageBytes!, 'delivery/${user.uid}');
       }
 
+      // Unit price = base + per-unit extras. Stored as `originalPrice` so the
+      // vendor's quantity recalculation (originalPrice × quantity) keeps the
+      // extras included.
+      final unitPrice = post.price + draft.extrasPerUnit;
+
       final order = OrderModel(
         id: orderRef.id,
         buyerId: user.uid,
@@ -177,8 +185,8 @@ class _SummaryView extends ConsumerWidget {
         postId: post.id,
         postTitle: post.title,
         postMediaUrls: post.mediaUrls,
-        originalPrice: post.price,
-        finalPrice: post.price * draft.quantity,
+        originalPrice: unitPrice,
+        finalPrice: unitPrice * draft.quantity,
         quantity: draft.quantity,
         offerApplied: post.hasOffer,
         offerType: post.offerType,
@@ -188,6 +196,7 @@ class _SummaryView extends ConsumerWidget {
         createdAt: DateTime.now(),
         chatExpiresAt: DateTime.now().add(const Duration(hours: 24)),
         selectedExtras: draft.selectedExtras,
+        extrasDetail: draft.extrasDetail,
       );
 
       await orderRef.set(order.toMap());
@@ -297,20 +306,14 @@ class _ProductCard extends StatelessWidget {
 // ── Extras card ────────────────────────────────────────────────────────────
 
 class _ExtrasCard extends StatelessWidget {
-  final PostModel post;
-  final Map<String, List<String>> selectedExtras;
-  const _ExtrasCard({required this.post, required this.selectedExtras});
+  final List<OrderExtra> extras;
+  const _ExtrasCard({required this.extras});
+
+  String _fmt(double v) => '\$${v.toStringAsFixed(v % 1 == 0 ? 0 : 2)}';
 
   @override
   Widget build(BuildContext context) {
-    final entries = <MapEntry<String, List<String>>>[];
-    for (final extra in post.extras) {
-      final chosen = selectedExtras[extra.id];
-      if (chosen != null && chosen.isNotEmpty) {
-        entries.add(MapEntry(extra.label, chosen));
-      }
-    }
-    if (entries.isEmpty) return const SizedBox.shrink();
+    if (extras.isEmpty) return const SizedBox.shrink();
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -326,20 +329,24 @@ class _ExtrasCard extends StatelessWidget {
               style:
                   AppTextStyles.caption.copyWith(color: AppColors.textSecondary)),
           const SizedBox(height: 8),
-          ...entries.map((e) => Padding(
+          ...extras.map((e) => Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('${e.key}: ',
-                        style: AppTextStyles.caption
-                            .copyWith(color: AppColors.textSecondary)),
                     Expanded(
                       child: Text(
-                        e.value.join(', '),
+                        '${e.group}: ${e.option}',
                         style: AppTextStyles.body
                             .copyWith(color: AppColors.textPrimary),
                       ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      e.price > 0 ? '+${_fmt(e.price)}' : 'Gratis',
+                      style: AppTextStyles.caption.copyWith(
+                          color: e.price > 0
+                              ? AppColors.accentGold
+                              : AppColors.textSecondary),
                     ),
                   ],
                 ),
@@ -353,13 +360,24 @@ class _ExtrasCard extends StatelessWidget {
 // ── Price card ─────────────────────────────────────────────────────────────
 
 class _PriceCard extends StatelessWidget {
-  final double unitPrice;
+  final double basePrice;
+  final List<OrderExtra> extras;
   final int quantity;
-  const _PriceCard({required this.unitPrice, required this.quantity});
+  const _PriceCard({
+    required this.basePrice,
+    required this.extras,
+    required this.quantity,
+  });
+
+  String _fmt(double v) => '\$${v.toStringAsFixed(v % 1 == 0 ? 0 : 2)}';
 
   @override
   Widget build(BuildContext context) {
+    final extrasPerUnit = extras.fold<double>(0, (s, e) => s + e.price);
+    final unitPrice = basePrice + extrasPerUnit;
     final total = unitPrice * quantity;
+    final showBreakdown = extrasPerUnit > 0 || quantity > 1;
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -367,31 +385,53 @@ class _PriceCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.borderOverlay),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          if (showBreakdown) ...[
+            _row('Producto', _fmt(basePrice)),
+            for (final e in extras)
+              if (e.price > 0)
+                _row('${e.group}: ${e.option}', '+${_fmt(e.price)}'),
+            if (quantity > 1) ...[
+              _row('Subtotal por unidad', _fmt(unitPrice)),
+              _row('Cantidad', '× $quantity'),
+            ],
+            const Divider(color: AppColors.borderOverlay, height: 20),
+          ],
+          Row(
             children: [
               Text('Total a pagar',
                   style: AppTextStyles.h3
                       .copyWith(color: AppColors.textPrimary)),
-              if (quantity > 1)
-                Text(
-                  '$quantity × \$${unitPrice.toStringAsFixed(unitPrice % 1 == 0 ? 0 : 2)}',
-                  style: AppTextStyles.caption
-                      .copyWith(color: AppColors.textSecondary),
-                ),
+              const Spacer(),
+              Text(_fmt(total),
+                  style:
+                      AppTextStyles.h2.copyWith(color: AppColors.accentGold)),
             ],
-          ),
-          const Spacer(),
-          Text(
-            '\$${total.toStringAsFixed(total % 1 == 0 ? 0 : 2)}',
-            style: AppTextStyles.h2.copyWith(color: AppColors.accentGold),
           ),
         ],
       ),
     );
   }
+
+  Widget _row(String label, String value) => Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(label,
+                  style: AppTextStyles.caption
+                      .copyWith(color: AppColors.textSecondary),
+                  overflow: TextOverflow.ellipsis),
+            ),
+            const SizedBox(width: 8),
+            Text(value,
+                style: AppTextStyles.caption
+                    .copyWith(color: AppColors.textPrimary)),
+          ],
+        ),
+      );
 }
 
 // ── Delivery card ──────────────────────────────────────────────────────────

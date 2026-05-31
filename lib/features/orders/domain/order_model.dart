@@ -7,6 +7,32 @@ import '../../../core/constants/app_constants.dart';
 // ignore: constant_identifier_names
 enum OrderStatus { pending, awaiting_payment, confirmed, delivered, cancelled, rejected }
 
+// ── OrderExtra ───────────────────────────────────────────────────────────────
+
+/// A single priced extra the buyer selected, stored on the order so every
+/// screen (summary, payment, detail) can itemize the breakdown without
+/// re-fetching the post. [price] is per unit.
+class OrderExtra {
+  final String group;
+  final String option;
+  final double price;
+
+  const OrderExtra({
+    required this.group,
+    required this.option,
+    this.price = 0,
+  });
+
+  factory OrderExtra.fromMap(Map<String, dynamic> m) => OrderExtra(
+        group: m['group'] as String? ?? '',
+        option: m['option'] as String? ?? '',
+        price: (m['price'] as num?)?.toDouble() ?? 0,
+      );
+
+  Map<String, dynamic> toMap() =>
+      {'group': group, 'option': option, 'price': price};
+}
+
 // ── Model ──────────────────────────────────────────────────────────────────
 
 class OrderModel {
@@ -35,6 +61,7 @@ class OrderModel {
   final bool isFlagged;
   final DateTime? paymentLockedAt;
   final bool postReactivated;
+  final List<OrderExtra> extrasDetail;
 
   const OrderModel({
     required this.id,
@@ -62,7 +89,12 @@ class OrderModel {
     this.isFlagged = false,
     this.paymentLockedAt,
     this.postReactivated = false,
+    this.extrasDetail = const [],
   });
+
+  /// Sum of the per-unit surcharges from all selected extras.
+  double get extrasPerUnit =>
+      extrasDetail.fold(0.0, (acc, e) => acc + e.price);
 
   // ── Factory ────────────────────────────────────────────────────────────────
 
@@ -129,6 +161,9 @@ class OrderModel {
       isFlagged: map['isFlagged'] as bool? ?? false,
       paymentLockedAt: parseDateOptional(map['paymentLockedAt']),
       postReactivated: map['postReactivated'] as bool? ?? false,
+      extrasDetail: (map['extrasDetail'] as List? ?? [])
+          .map((e) => OrderExtra.fromMap(Map<String, dynamic>.from(e as Map)))
+          .toList(),
     );
   }
 
@@ -163,6 +198,7 @@ class OrderModel {
         if (paymentLockedAt != null)
           'paymentLockedAt': Timestamp.fromDate(paymentLockedAt!),
         'postReactivated': postReactivated,
+        'extrasDetail': extrasDetail.map((e) => e.toMap()).toList(),
       };
 
   // ── copyWith ───────────────────────────────────────────────────────────────
@@ -193,6 +229,7 @@ class OrderModel {
     bool? isFlagged,
     DateTime? paymentLockedAt,
     bool? postReactivated,
+    List<OrderExtra>? extrasDetail,
   }) {
     return OrderModel(
       id: id ?? this.id,
@@ -220,6 +257,7 @@ class OrderModel {
       isFlagged: isFlagged ?? this.isFlagged,
       paymentLockedAt: paymentLockedAt ?? this.paymentLockedAt,
       postReactivated: postReactivated ?? this.postReactivated,
+      extrasDetail: extrasDetail ?? this.extrasDetail,
     );
   }
 }

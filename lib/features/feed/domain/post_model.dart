@@ -6,6 +6,31 @@ enum VendorAvailability { active, busy, offline }
 
 enum OfferType { twoForOne, percent, special }
 
+// ── PostExtraOption ──────────────────────────────────────────────────────────
+
+/// A single selectable option inside a [PostExtra] group, with an optional
+/// surcharge. `price == 0` means the option is free.
+class PostExtraOption {
+  final String label;
+  final double price;
+
+  const PostExtraOption({required this.label, this.price = 0});
+
+  /// Parses either the new map form `{label, price}` or the legacy plain
+  /// string form (price defaults to 0) for backward compatibility.
+  factory PostExtraOption.fromAny(dynamic v) {
+    if (v is Map) {
+      return PostExtraOption(
+        label: v['label'] as String? ?? '',
+        price: (v['price'] as num?)?.toDouble() ?? 0,
+      );
+    }
+    return PostExtraOption(label: v?.toString() ?? '', price: 0);
+  }
+
+  Map<String, dynamic> toMap() => {'label': label, 'price': price};
+}
+
 // ── PostExtra ──────────────────────────────────────────────────────────────
 
 /// A configurable extra / condiment group that the buyer can choose when
@@ -14,7 +39,7 @@ class PostExtra {
   final String id;
   final String label;
   final bool isMultiple;
-  final List<String> options;
+  final List<PostExtraOption> options;
 
   const PostExtra({
     required this.id,
@@ -27,14 +52,16 @@ class PostExtra {
         id: map['id'] as String? ?? '',
         label: map['label'] as String? ?? '',
         isMultiple: map['isMultiple'] as bool? ?? false,
-        options: List<String>.from(map['options'] as List? ?? []),
+        options: (map['options'] as List? ?? [])
+            .map((e) => PostExtraOption.fromAny(e))
+            .toList(),
       );
 
   Map<String, dynamic> toMap() => {
         'id': id,
         'label': label,
         'isMultiple': isMultiple,
-        'options': options,
+        'options': options.map((o) => o.toMap()).toList(),
       };
 }
 

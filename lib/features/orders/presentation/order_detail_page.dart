@@ -112,16 +112,39 @@ class _OrderDetailBody extends ConsumerWidget {
                           '\$${order.finalPrice.toStringAsFixed(order.finalPrice % 1 == 0 ? 0 : 2)}',
                       valueColor: AppColors.accentGold,
                     ),
-                    if (order.offerApplied)
-                      _InfoRow(
-                        label: 'Precio original',
-                        value:
-                            '\$${order.originalPrice.toStringAsFixed(order.originalPrice % 1 == 0 ? 0 : 2)}',
-                        strikethrough: true,
-                      ),
                   ],
                 ),
                 const SizedBox(height: 12),
+
+                // ── Extras breakdown ──────────────────────────────────────
+                if (order.extrasDetail.isNotEmpty) ...[
+                  _SectionCard(
+                    children: [
+                      Text('PERSONALIZACIONES',
+                          style: AppTextStyles.caption
+                              .copyWith(color: AppColors.textSecondary)),
+                      const SizedBox(height: 10),
+                      _InfoRow(
+                        label: 'Producto',
+                        value:
+                            '\$${(order.originalPrice - order.extrasPerUnit).toStringAsFixed((order.originalPrice - order.extrasPerUnit) % 1 == 0 ? 0 : 2)}',
+                      ),
+                      ...order.extrasDetail.map((e) => _InfoRow(
+                            label: '${e.group}: ${e.option}',
+                            value: e.price > 0
+                                ? '+\$${e.price.toStringAsFixed(e.price % 1 == 0 ? 0 : 2)}'
+                                : 'Gratis',
+                          )),
+                      if (order.quantity > 1)
+                        _InfoRow(
+                          label: 'Subtotal por unidad',
+                          value:
+                              '\$${order.originalPrice.toStringAsFixed(order.originalPrice % 1 == 0 ? 0 : 2)}  ×  ${order.quantity}',
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ],
 
                 // ── Buyer / vendor info ───────────────────────────────────
                 _SectionCard(
@@ -576,13 +599,11 @@ class _InfoRow extends StatelessWidget {
   final String label;
   final String value;
   final Color? valueColor;
-  final bool strikethrough;
 
   const _InfoRow({
     required this.label,
     required this.value,
     this.valueColor,
-    this.strikethrough = false,
   });
 
   @override
@@ -591,18 +612,18 @@ class _InfoRow extends StatelessWidget {
       padding: const EdgeInsets.only(top: 6),
       child: Row(
         children: [
-          Text(label,
-              style:
-                  AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
-          const Spacer(),
+          Expanded(
+            child: Text(label,
+                style: AppTextStyles.body
+                    .copyWith(color: AppColors.textSecondary)),
+          ),
+          const SizedBox(width: 8),
           Text(
             value,
             style: AppTextStyles.body.copyWith(
               color: valueColor ?? AppColors.textPrimary,
               fontWeight:
                   valueColor != null ? FontWeight.w600 : FontWeight.normal,
-              decoration:
-                  strikethrough ? TextDecoration.lineThrough : null,
             ),
           ),
         ],

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../feed/domain/post_model.dart';
+import '../domain/order_model.dart';
 
 // ── OrderDraft ─────────────────────────────────────────────────────────────
 
@@ -12,6 +13,9 @@ class OrderDraft {
   final Uint8List? deliveryImageBytes;
   final String? deliveryImageUrl;
   final Map<String, List<String>> selectedExtras;
+
+  /// Priced breakdown of [selectedExtras] (group, option, per-unit price).
+  final List<OrderExtra> extrasDetail;
   final int quantity;
 
   const OrderDraft({
@@ -20,8 +24,13 @@ class OrderDraft {
     this.deliveryImageBytes,
     this.deliveryImageUrl,
     this.selectedExtras = const {},
+    this.extrasDetail = const [],
     this.quantity = 1,
   });
+
+  /// Sum of per-unit extra surcharges.
+  double get extrasPerUnit =>
+      extrasDetail.fold(0.0, (sum, e) => sum + e.price);
 
   OrderDraft copyWith({
     PostModel? post,
@@ -29,6 +38,7 @@ class OrderDraft {
     Uint8List? deliveryImageBytes,
     String? deliveryImageUrl,
     Map<String, List<String>>? selectedExtras,
+    List<OrderExtra>? extrasDetail,
     int? quantity,
   }) {
     return OrderDraft(
@@ -37,6 +47,7 @@ class OrderDraft {
       deliveryImageBytes: deliveryImageBytes ?? this.deliveryImageBytes,
       deliveryImageUrl: deliveryImageUrl ?? this.deliveryImageUrl,
       selectedExtras: selectedExtras ?? this.selectedExtras,
+      extrasDetail: extrasDetail ?? this.extrasDetail,
       quantity: quantity ?? this.quantity,
     );
   }
