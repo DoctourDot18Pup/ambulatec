@@ -30,7 +30,7 @@ Crea **4 cuentas de Google distintas** y configura sus documentos en `Firestore 
 
 ---
 
-## Prueba 1 — Onboarding y autenticación ✅
+## Prueba 1 — Onboarding y autenticación (CORRECTO)
 
 ### 1.1 Primera apertura (dispositivo limpio)
 1. Abre la app → deben aparecer las pantallas de **Onboarding** (slides introductorios).
@@ -64,7 +64,7 @@ Crea **4 cuentas de Google distintas** y configura sus documentos en `Firestore 
 
 ---
 
-## Prueba 2 — Guards del router ✅
+## Prueba 2 — Guards del router (CORRECTO)
 
 Verifica que las redirecciones de seguridad funcionen correctamente:
 
@@ -112,7 +112,7 @@ Con `vendor1@...` (aprobado):
 - La publicación aparece en el feed de `/home` (comprobable con `buyer@...`).
 - La imagen se sube correctamente a Cloudinary y se muestra en la tarjeta.
 
-### 4.1 Complementos con precio ✅
+### 4.1 Complementos con precio (CORRECTO)
 
 > Sección **"PERSONALIZACIONES"** al final del formulario de creación.
 
@@ -134,7 +134,7 @@ Con `vendor1@...` (aprobado):
 
 ---
 
-## Prueba 5 — Feed y búsqueda (Comprador) ✅
+## Prueba 5 — Feed y búsqueda (Comprador) (CORRECTO)
 
 Con `buyer@...`:
 
@@ -145,14 +145,14 @@ Con `buyer@...`:
 
 ### 5.2 Perfil público del vendedor
 1. Verifica que se muestre: avatar, nombre, carrera, calificación (estrellas), estado (online/busy).
-2. Presiona **Seguir** → el botón cambia a "Siguiendo". ⚠️ *Pendiente de implementar*
-3. Presiona de nuevo → deja de seguir. ⚠️ *Pendiente de implementar*
+2. Presiona **Seguir** → el botón cambia a "Siguiendo".
+3. Presiona de nuevo → deja de seguir.
 4. La grilla de publicaciones activas del vendedor es visible.
 5. Las reseñas aparecen debajo; presiona "Ver todas" → abre el modal con el listado completo.
 
 > **Nota:** el botón de seguir no debe aparecer si el comprador visita su propio perfil de vendedor.
 
-### 5.3 Búsqueda ✅
+### 5.3 Búsqueda (CORRECTO)
 1. Abre `/search`.
 2. **Estado inicial** (sin texto): muestra la grilla de 6 categorías + lista horizontal de vendedores activos.
 3. Escribe al menos 2 caracteres → aparecen resultados de posts y vendedores.
@@ -165,7 +165,7 @@ Con `buyer@...`:
 > respetaba mayúsculas (ej. `tacos` no encontraba *"TACOS…"*). Ahora filtra del
 > lado cliente con `contains` en minúsculas.
 
-#### 5.3.1 Filtro por categoría ✅
+#### 5.3.1 Filtro por categoría (CORRECTO)
 1. En el estado inicial, toca una de las tarjetas de **categoría** (ej. *"Bebidas"*).
 2. **Resultado esperado:** navega a `/home` con el feed **filtrado por esa categoría** (no escribe el nombre en el buscador).
 3. Toca *"Ver todo"* → el feed muestra todas las categorías.
@@ -188,7 +188,7 @@ Con `buyer@...`:
 
 ---
 
-## Prueba 6 — Flujo completo de orden ✅
+## Prueba 6 — Flujo completo de orden (CORRECTO)
 
 ### Paso 1 — Comprador especifica cantidad, complementos y envía solicitud
 1. `buyer` abre un post (que tenga complementos definidos, ver Prueba 4.1) → en `/post/:id`.
@@ -230,7 +230,7 @@ Con `buyer@...`:
 ### Paso 4 — Pago del comprador
 17. `buyer` presiona **"Proceder al pago — $XX"** → navega a `/payment`.
 18. Ingresa la tarjeta de prueba (`4242 4242 4242 4242`) y confirma.
-19. La orden pasa a `confirmed`; aparece mensaje del sistema *"💳 ¡Pago recibido!"*.
+19. La orden pasa a `confirmed`; aparece mensaje del sistema *"¡Pago recibido!"*.
 
 ### Paso 5 — Entrega
 20. `vendor1` ve el botón **"Marcar como entregado"** → confirma en el diálogo → orden pasa a `delivered`.
@@ -242,7 +242,7 @@ Con `buyer@...`:
 24. La reseña aparece en `/vendor/:vendorId` de `vendor1` (sección overview para compradores).
 25. `vendor1` puede ver la reseña en su página **"Mis reseñas"** (`/my-reviews`).
 
-### 6.1 Rechazo y reactivación de publicación ✅
+### 6.1 Rechazo y reactivación de publicación (CORRECTO)
 
 1. `vendor1` recibe una solicitud y presiona **Rechazar** (en `/order-alert/:id` o `/order-detail/:id`).
 2. La orden pasa a `rejected` y la **publicación asociada se desactiva** (deja de aparecer en el feed).
@@ -256,7 +256,7 @@ Con `buyer@...`:
 
 ---
 
-## Prueba 7 — Página de órdenes ✅
+## Prueba 7 — Página de órdenes (CORRECTO)
 
 ### Vista comprador (`buyer`)
 | Pestaña | Órdenes esperadas |
@@ -300,13 +300,13 @@ Con `vendor1` (con al menos una orden entregada):
 
 ---
 
-## Prueba 9 — Perfil de usuario ✅
+## Prueba 9 — Perfil de usuario (CORRECTO)
 
 Con cualquier cuenta:
 1. Navega a `/profile`.
 2. Presiona **"Cerrar sesión"** → redirige a `/login`.
 
-### 9.1 Editar nombre ✅
+### 9.1 Editar nombre (CORRECTO)
 1. Desde `/profile`, presiona **"Editar perfil"** → aparece el bottom sheet de edición.
 2. Modifica el campo **Nombre completo**.
 3. Presiona **"Guardar"** → el indicador de carga aparece mientras se guarda.
@@ -316,7 +316,7 @@ Con cualquier cuenta:
 
 **Resultado esperado:** la actualización propaga a toda la app sin recargar manualmente.
 
-### 9.2 Cambiar foto de perfil ✅
+### 9.2 Cambiar foto de perfil (CORRECTO)
 1. Abre el bottom sheet de **"Editar perfil"**.
 2. Toca el **avatar** → se abre el selector de imágenes del dispositivo/navegador.
 3. Selecciona una imagen → la previsualización se actualiza en el círculo del sheet.
@@ -351,7 +351,7 @@ Con `admin@...`:
 2. Aprueba un vendedor → desaparece de la lista + `vendorStatus` cambia a `approved` en Firestore.
 3. Rechaza otro vendedor → desaparece de la lista + `vendorStatus` cambia a `rejected`.
 
-### 10.2 Pestaña Reportes ✅
+### 10.2 Pestaña Reportes (CORRECTO)
 1. Cambia a la pestaña **"Reportes"** → se listan los tickets de la colección `support_tickets`, más recientes primero.
 2. Cada tarjeta muestra: tema, sub-opción, detalle, autor (nombre + email), fecha y estado (**Abierto** / **Resuelto**).
 3. Si el reporte vino del **chat** (ver Prueba 13.6), muestra además el **contexto del pedido** (`#AT-XXXXXX` y sobre quién es).
@@ -369,7 +369,7 @@ Verifica que una cuenta sin `isAdmin: true` no pueda acceder a esta ruta (ver Pr
 2. `vendor1` debe recibir una **notificación local** del sistema operativo.
 3. Tap en la notificación → abre la app directamente en `/order-alert/:orderId`.
 
-> ⚠️ **Limitación conocida (decisión de diseño del demo):**
+> **Limitación conocida (decisión de diseño del demo):**
 > Las notificaciones locales se generan mediante un *listener* de Firestore que
 > corre **dentro de la app**. Android mantiene vivo el proceso solo unos minutos
 > tras minimizar; después lo congela (Doze / restricciones de batería) y el
@@ -382,18 +382,18 @@ Verifica que una cuenta sin `isAdmin: true` no pueda acceder a esta ruta (ver Pr
 > un proyecto demostrativo sin presupuesto, se optó por **no** habilitarlo. El
 > **historial de notificaciones dentro de la app siempre funciona** (Prueba 12.3).
 
-### Web ✅
+### Web (CORRECTO)
 1. Abre la app en Chrome → acepta el permiso de notificaciones cuando se solicite.
 2. Verifica en **DevTools → Application → Service Workers** que `firebase-messaging-sw.js` esté activo.
 3. Con la pestaña en segundo plano, realiza una orden → debe aparecer una notificación de sistema.
 
 ---
 
-## Prueba 12 — Preferencias de notificaciones ✅
+## Prueba 12 — Preferencias de notificaciones (CORRECTO)
 
 Con cualquier cuenta autenticada:
 
-### 12.1 Acceso a la página ✅
+### 12.1 Acceso a la página (CORRECTO)
 1. Navega a `/profile` → presiona **"Notificaciones"** → redirige a `/notifications`.
 2. La página tiene dos secciones visibles: **PREFERENCIAS** e **HISTORIAL**.
 
@@ -426,11 +426,11 @@ Con cualquier cuenta autenticada:
 
 ---
 
-## Prueba 13 — Ayuda y soporte ✅
+## Prueba 13 — Ayuda y soporte (CORRECTO)
 
 Con cualquier cuenta autenticada:
 
-### 13.1 Apertura del sheet ✅
+### 13.1 Apertura del sheet (CORRECTO)
 1. Navega a `/profile` → presiona **"Ayuda y soporte"** → aparece un bottom sheet.
 2. El sheet muestra el título "Ayuda y soporte" con el subtítulo *"¿En qué podemos ayudarte?"*.
 3. Se listan **5 categorías** con icono y chevron:
@@ -440,7 +440,7 @@ Con cualquier cuenta autenticada:
    - Sugerencia de mejora
    - Otro
 
-### 13.2 Flujo con sub-opciones (Reportar un problema) ✅
+### 13.2 Flujo con sub-opciones (Reportar un problema) (CORRECTO)
 1. Presiona **"Reportar un problema"** → el sheet anima a la vista de opciones.
 2. El título cambia a *"Reportar un problema"* con flecha de retroceso.
 3. Se muestran 6 sub-opciones:
@@ -453,7 +453,7 @@ Con cualquier cuenta autenticada:
 4. Presiona la flecha de retroceso → regresa a la pantalla de categorías.
 5. Selecciona una sub-opción (ej. *"No puedo enviar mensajes"*) → anima a la vista de detalles.
 
-### 13.3 Vista de detalles y envío ✅
+### 13.3 Vista de detalles y envío (CORRECTO)
 1. La vista muestra:
    - Chip dorado con la categoría seleccionada.
    - Chip secundario con la sub-opción seleccionada.
@@ -463,7 +463,7 @@ Con cualquier cuenta autenticada:
 3. Escribe texto en el campo (opcional) → presiona **"Enviar reporte"**.
 4. Aparece el indicador de carga en el botón mientras se guarda.
 
-### 13.4 Pantalla de éxito ✅
+### 13.4 Pantalla de éxito (CORRECTO)
 1. Tras el envío exitoso → aparece la pantalla de éxito con:
    - Círculo verde con ícono de paloma.
    - Texto *"¡Mensaje enviado!"*
@@ -477,7 +477,7 @@ Con cualquier cuenta autenticada:
 2. Solo aparece el chip dorado con la categoría (sin chip de sub-opción).
 3. Completa el envío → pantalla de éxito funciona igual.
 
-### 13.6 Reporte desde el chat (contextual) ✅
+### 13.6 Reporte desde el chat (contextual) (CORRECTO)
 
 > Reportar directamente donde ocurre el problema, no solo desde el perfil.
 

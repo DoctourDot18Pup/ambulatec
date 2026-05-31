@@ -442,9 +442,9 @@ El token FCM se imprime en consola debug al iniciar la app:
 **Tarjetas de prueba:**
 | Resultado | Número |
 |---|---|
-| ✅ Aprobada | `4242 4242 4242 4242` |
-| ❌ Rechazada | `4000 0000 0000 0002` |
-| ❌ Fondos insuficientes | `4000 0000 0000 9995` |
+| Aprobada | `4242 4242 4242 4242` |
+| Rechazada | `4000 0000 0000 0002` |
+| Fondos insuficientes | `4000 0000 0000 9995` |
 
 Fecha de expiración: cualquier fecha futura. CVC: cualquier 3 dígitos.
 

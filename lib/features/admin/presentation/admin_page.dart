@@ -488,7 +488,7 @@ class _VendorCard extends ConsumerWidget {
     });
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Vendedor aprobado ✅'),
+        content: Text('Vendedor aprobado'),
         behavior: SnackBarBehavior.floating,
       ));
     }

@@ -265,7 +265,7 @@ class _DesktopDashboard extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Hola, $firstName 👋',
+                        'Hola, $firstName',
                         style: AppTextStyles.h1
                             .copyWith(color: AppColors.textPrimary),
                       ),

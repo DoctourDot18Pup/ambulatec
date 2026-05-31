@@ -271,7 +271,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     if (isExpired) return 'Chat expirado (24 h)';
     switch (order.status) {
       case OrderStatus.delivered:
-        return '¡Pedido entregado! Gracias por usar AmbulaTec 🎉';
+        return '¡Pedido entregado! Gracias por usar AmbulaTec';
       case OrderStatus.rejected:
         return 'Pedido rechazado por el vendedor.';
       case OrderStatus.cancelled:

@@ -58,7 +58,7 @@ class ChatController {
 
     await _addSystemMessage(
         order.id,
-        '✅ ¡El vendedor aceptó tu pedido!$qtyNote Procede al pago para confirmarlo.');
+        '¡El vendedor aceptó tu pedido!$qtyNote Procede al pago para confirmarlo.');
 
     await FirebaseFirestore.instance
         .collection(AppConstants.notificationsCollection)
@@ -98,7 +98,7 @@ class ChatController {
         : newTotal.toStringAsFixed(2);
     await _addSystemMessage(
         order.id,
-        '🔄 El vendedor ajustó la cantidad a $quantity. Nuevo total: \$$fmt');
+        'El vendedor ajustó la cantidad a $quantity. Nuevo total: \$$fmt');
   }
 
   /// Vendor rejects: `pending → rejected`.
@@ -118,7 +118,7 @@ class ChatController {
     }
 
     await _addSystemMessage(
-        order.id, '❌ El vendedor no pudo aceptar este pedido.');
+        order.id, 'El vendedor no pudo aceptar este pedido.');
   }
 
   /// Called after buyer pays: `awaiting_payment → confirmed`.
@@ -135,7 +135,7 @@ class ChatController {
     });
 
     await _addSystemMessage(order.id,
-        '💳 ¡Pago recibido! El vendedor tiene 1 hora para entregar tu pedido.');
+        '¡Pago recibido! El vendedor tiene 1 hora para entregar tu pedido.');
 
     // Notify vendor that payment was received.
     await FirebaseFirestore.instance
@@ -162,7 +162,7 @@ class ChatController {
       'deliveredAt': Timestamp.fromDate(DateTime.now()),
     });
     await _addSystemMessage(
-        order.id, '🎉 ¡El vendedor marcó el pedido como entregado!');
+        order.id, '¡El vendedor marcó el pedido como entregado!');
 
     // Notify buyer to leave a review.
     await FirebaseFirestore.instance
@@ -199,7 +199,7 @@ class ChatController {
 
     await _addSystemMessage(
         order.id,
-        '⏰ El tiempo de entrega expiró. El pedido fue cancelado y se '
+        'El tiempo de entrega expiró. El pedido fue cancelado y se '
         'procesó el reembolso automático.');
   }
 
@@ -223,7 +223,7 @@ class ChatController {
 
     await _addSystemMessage(
         order.id,
-        '✅ El vendedor reactivó la publicación. ¡Ya puedes hacer un nuevo pedido!');
+        'El vendedor reactivó la publicación. ¡Ya puedes hacer un nuevo pedido!');
 
     await FirebaseFirestore.instance
         .collection(AppConstants.notificationsCollection)

@@ -4,8 +4,8 @@
 // It must live at the root of the "web/" folder so the browser
 // can register it at the scope "/".
 //
-// ⚠️  These scripts are loaded inside a Service Worker — they must use
-//     the Firebase *compat* SDK (not the modular SDK).
+// NOTA: These scripts are loaded inside a Service Worker — they must use
+//       the Firebase *compat* SDK (not the modular SDK).
 
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');

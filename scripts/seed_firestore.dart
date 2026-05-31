@@ -129,7 +129,7 @@ Future<void> main() async {
   print('Seeding ${posts.length} posts...');
   for (final post in posts) {
     final ref = await col.add(post);
-    print('  ✓ ${post['title']} → ${ref.id}');
+    print('  - ${post['title']} -> ${ref.id}');
   }
   print('Done!');
 
@@ -147,7 +147,7 @@ class _SeedDoneApp extends StatelessWidget {
         backgroundColor: Color(0xFF0A0F0A),
         body: Center(
           child: Text(
-            '✓ Seed completado',
+            'Seed completado',
             style: TextStyle(color: Color(0xFFC9A96E), fontSize: 24),
           ),
         ),
