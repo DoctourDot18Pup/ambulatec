@@ -73,14 +73,16 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
     final controllerLoading = ref.watch(authControllerProvider).isLoading;
     final firebaseUser = ref.watch(authStateProvider).asData?.value;
-    final userAsync = ref.watch(userProvider);
+    ref.watch(userProvider); // keep provider alive; router reacts to its changes
 
-    // Keep loading while: the sign-in operation runs (controllerLoading), OR
-    // Firebase already has a user but Firestore hasn't delivered the profile
-    // yet (isLoading). This prevents the Google button from briefly re-appearing
-    // between signInWithCredential succeeding and the router redirecting.
-    final isLoading = controllerLoading ||
-        (firebaseUser != null && userAsync.isLoading);
+    // Show spinner whenever:
+    // • The sign-in operation is in progress (controllerLoading), OR
+    // • Firebase has a user but Firestore hasn't resolved yet (isLoading), OR
+    // • Firebase has a user but Firestore responded with null (network error or
+    //   missing document) — in this case the router will redirect to /role-select
+    //   once it re-evaluates; show spinner instead of the Google button to avoid
+    //   a confusing flash of the sign-in screen.
+    final isLoading = controllerLoading || firebaseUser != null;
 
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,

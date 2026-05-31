@@ -72,7 +72,8 @@ class RouterNotifier extends ChangeNotifier {
     if (!_initialized) return null;
 
     final firebaseUser = _ref.read(authStateProvider).asData?.value;
-    final userModel = _ref.read(userProvider).asData?.value;
+    final userAsync = _ref.read(userProvider);
+    final userModel = userAsync.asData?.value;
     final loc = state.matchedLocation;
 
     // ── Unauthenticated ──────────────────────────────────────────────────────
@@ -81,10 +82,18 @@ class RouterNotifier extends ChangeNotifier {
       return _onboardingSeen ? '/login' : '/onboarding';
     }
 
-    // ── Authenticated — waiting for Firestore data ───────────────────────────
+    // ── Authenticated — Firestore stream still initializing ──────────────────
+    if (userAsync.isLoading) return null;
+
+    // ── Authenticated — Firestore responded with null ────────────────────────
+    // Either the document doesn't exist yet (new user whose signup failed
+    // mid-flight) or a transient error was silently converted to null.
+    // In both cases, send the user to /role-select so they can complete
+    // account setup; when Firestore recovers and the document loads the
+    // router will redirect them to /home or /dashboard automatically.
     if (userModel == null) {
       if (loc == '/role-select') return null;
-      return null; // Stay while loading.
+      return '/role-select';
     }
 
     // ── Authenticated — block access to public routes ────────────────────────

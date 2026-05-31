@@ -34,24 +34,32 @@ class AuthController extends Notifier<AsyncValue<void>> {
       final user = userCredential.user;
       if (user == null) return;
 
-      final userRef = FirebaseFirestore.instance
-          .collection(AppConstants.usersCollection)
-          .doc(user.uid);
-
-      final snapshot = await userRef.get();
-      if (!snapshot.exists) {
-        await userRef.set(
-          UserModel(
-            uid: user.uid,
-            displayName: user.displayName ?? '',
-            email: user.email ?? '',
-            photoUrl: user.photoURL,
-            roles: [],
-            vendorStatus: null,
-            createdAt: DateTime.now(),
-            onboardingCompleted: true,
-          ).toMap(),
-        );
+      // Firestore document creation is best-effort: if the network is
+      // unavailable the sign-in still succeeds and the document will be
+      // created later (role-select flow or on next successful connection).
+      try {
+        final userRef = FirebaseFirestore.instance
+            .collection(AppConstants.usersCollection)
+            .doc(user.uid);
+        final snapshot = await userRef.get();
+        if (!snapshot.exists) {
+          await userRef.set(
+            UserModel(
+              uid: user.uid,
+              displayName: user.displayName ?? '',
+              email: user.email ?? '',
+              photoUrl: user.photoURL,
+              roles: [],
+              vendorStatus: null,
+              createdAt: DateTime.now(),
+              onboardingCompleted: true,
+            ).toMap(),
+          );
+        }
+      } catch (_) {
+        // Firestore unreachable — Firebase Auth succeeded so the user IS
+        // authenticated. The router will send them to /role-select once
+        // Firestore recovers and confirms no document exists.
       }
     });
   }
