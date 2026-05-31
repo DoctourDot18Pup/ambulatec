@@ -7,6 +7,7 @@ import '../../../shared/widgets/adaptive_scaffold.dart';
 import '../../../shared/widgets/empty_state_widget.dart';
 import '../../../shared/widgets/rating_stars_widget.dart';
 import '../../auth/domain/user_model.dart';
+import '../data/category_filter_provider.dart';
 import '../domain/post_model.dart';
 import '../providers/search_provider.dart';
 
@@ -139,9 +140,10 @@ class _InitialState extends ConsumerWidget {
               icon: cat.icon,
               label: cat.label,
               onTap: () {
-                ref.read(searchQueryProvider.notifier).update(cat.id == 'todos'
-                    ? ''
-                    : cat.label.toLowerCase());
+                // Apply the real category filter (by the post `category` field)
+                // and jump to the feed, which already renders filtered posts.
+                ref.read(categoryFilterProvider.notifier).update(cat.id);
+                context.go('/home');
               },
             );
           }).toList(),

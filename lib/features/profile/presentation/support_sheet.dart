@@ -74,7 +74,18 @@ enum _Step { topic, option, details, success }
 // ── Sheet root ─────────────────────────────────────────────────────────────
 
 class SupportSheet extends ConsumerStatefulWidget {
-  const SupportSheet({super.key});
+  /// Optional order context. When opened from a chat/order, the report is
+  /// linked to this order and the flow starts pre-focused on user/order issues.
+  final String? orderId;
+  final String? reportedUserId;
+  final String? reportedUserName;
+
+  const SupportSheet({
+    super.key,
+    this.orderId,
+    this.reportedUserId,
+    this.reportedUserName,
+  });
 
   @override
   ConsumerState<SupportSheet> createState() => _SupportSheetState();
@@ -130,6 +141,12 @@ class _SupportSheetState extends ConsumerState<SupportSheet> {
         'details': _detailsCtrl.text.trim(),
         'status': 'open',
         'createdAt': FieldValue.serverTimestamp(),
+        // Order context (present only when opened from a chat/order).
+        if (widget.orderId != null) 'orderId': widget.orderId,
+        if (widget.reportedUserId != null)
+          'reportedUserId': widget.reportedUserId,
+        if (widget.reportedUserName != null)
+          'reportedUserName': widget.reportedUserName,
       });
       if (mounted) setState(() => _step = _Step.success);
     } catch (e) {
@@ -161,6 +178,10 @@ class _SupportSheetState extends ConsumerState<SupportSheet> {
         return _TopicStep(
           key: const ValueKey('topic'),
           onSelect: _onTopicSelected,
+          contextNote: widget.orderId != null
+              ? 'Reporte vinculado a tu pedido'
+                  '${widget.reportedUserName != null ? ' con ${widget.reportedUserName}' : ''}.'
+              : null,
         );
       case _Step.option:
         return _OptionStep(
@@ -192,7 +213,8 @@ class _SupportSheetState extends ConsumerState<SupportSheet> {
 
 class _TopicStep extends StatelessWidget {
   final ValueChanged<_Topic> onSelect;
-  const _TopicStep({super.key, required this.onSelect});
+  final String? contextNote;
+  const _TopicStep({super.key, required this.onSelect, this.contextNote});
 
   @override
   Widget build(BuildContext context) {
@@ -201,13 +223,39 @@ class _TopicStep extends StatelessWidget {
       subtitle: '¿En qué podemos ayudarte?',
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        children: _kTopics
-            .map((t) => _SelectTile(
-                  icon: t.icon,
-                  label: t.label,
-                  onTap: () => onSelect(t),
-                ))
-            .toList(),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (contextNote != null) ...[
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 12),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.accentGold.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: AppColors.accentGold.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.link, size: 16, color: AppColors.accentGold),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(contextNote!,
+                        style: AppTextStyles.caption
+                            .copyWith(color: AppColors.accentGold)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          ..._kTopics.map((t) => _SelectTile(
+                icon: t.icon,
+                label: t.label,
+                onTap: () => onSelect(t),
+              )),
+        ],
       ),
     );
   }

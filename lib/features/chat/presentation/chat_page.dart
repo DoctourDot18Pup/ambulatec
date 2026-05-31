@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../orders/domain/order_model.dart';
 import '../../orders/providers/payment_provider.dart';
+import '../../profile/presentation/support_sheet.dart';
 import '../domain/message_model.dart';
 import '../providers/chat_controller.dart';
 import '../providers/chat_provider.dart';
@@ -207,6 +208,46 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 .copyWith(color: AppColors.textSecondary),
           ),
         ],
+      ),
+      actions: [
+        PopupMenuButton<String>(
+          color: AppColors.bgCard,
+          icon: const Icon(Icons.more_vert, color: AppColors.textPrimary),
+          onSelected: (value) {
+            if (value == 'report') _openReport(order, isVendor);
+          },
+          itemBuilder: (_) => [
+            PopupMenuItem<String>(
+              value: 'report',
+              child: Row(
+                children: [
+                  const Icon(Icons.flag_outlined,
+                      size: 18, color: AppColors.error),
+                  const SizedBox(width: 10),
+                  Text('Reportar un problema',
+                      style: AppTextStyles.body
+                          .copyWith(color: AppColors.textPrimary)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  void _openReport(OrderModel order, bool isVendor) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.bgCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SupportSheet(
+        orderId: order.id,
+        reportedUserId: isVendor ? order.buyerId : order.vendorId,
+        reportedUserName: isVendor ? order.buyerName : 'el vendedor',
       ),
     );
   }
